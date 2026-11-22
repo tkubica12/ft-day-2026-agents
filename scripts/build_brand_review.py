@@ -15,21 +15,19 @@ LABELS = {
 }
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path)
-    args = parser.parse_args()
-    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+def load_images(manifest_path, expected):
+    manifest_path = Path(manifest_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest["summary"]["failed"]:
         raise ValueError("The generation run contains failures; do not show it as a complete set.")
     records = manifest["records"]
-    if {r["lineage"]["image"] for r in records} != {*LABELS, "workshop-hero"} or len(records) != 4:
-        raise ValueError("Expected exactly the four authored candidates.")
+    if {r["lineage"]["image"] for r in records} != set(expected) or len(records) != len(expected):
+        raise ValueError("Expected exactly the authored candidates.")
     images = {}
     for record in records:
         name = record["lineage"]["image"]
-        source = (args.manifest.parent.parent / record["original"]).resolve()
-        source.relative_to(args.manifest.parent.parent.resolve())
+        source = (manifest_path.parent.parent / record["original"]).resolve()
+        source.relative_to(manifest_path.parent.parent.resolve())
         data = source.read_bytes()
         if hashlib.sha256(data).hexdigest() != record["image_sha256"]:
             raise ValueError(f"{name}: original hash mismatch")
@@ -45,6 +43,14 @@ def main():
         destination.write_bytes(data)
         images[name] = relative.as_posix()
         print(f"{name}: {destination} ({len(data)} bytes; 2048x2048)")
+    return manifest, images
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("manifest", type=Path)
+    args = parser.parse_args()
+    manifest, images = load_images(args.manifest, {*LABELS, "workshop-hero"})
 
     text = head("article.template.html", "Javorna — brand directions", "ft2026-brand-review")
     style = """<style>

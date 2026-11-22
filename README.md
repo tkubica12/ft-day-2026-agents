@@ -70,6 +70,19 @@ dimensions and hash, copies it unchanged to ignored `docs/brand-candidates/`,
 and builds the local `docs/brand-review.html` gallery with title-slide studies.
 Candidates remain unapproved and outside the presentation until selected.
 
+The second review round uses furniture silhouettes and explicitly requested
+wood/foliage brand palettes, without changing the shared document runtime:
+`brand/furniture-brief.yaml` and `brand/furniture-palettes.json`.
+Prepare that brief with
+`python scripts\prepare_images.py brand\furniture-brief.yaml --output .local\furniture-brief.json`.
+After approved generation, run
+`python scripts\build_furniture_review.py <new-run.json> --atelier-manifest <original-run.json>`.
+This preserves the approved atelier image and creates local
+`docs/furniture-review.html` (three comparisons) and `docs/furniture-slides.html`
+(six full-size title/content studies). Logos and palettes can be selected
+independently. All candidates and their original bytes remain local and
+unapproved; `docs/presentation.html` is unchanged.
+
 ## Runtime boundary
 
 The intended architecture remains Teams -> gateway -> Hermes -> Foundry, with

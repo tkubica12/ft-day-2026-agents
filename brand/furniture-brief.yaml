@@ -1,0 +1,86 @@
+common_requirements: |
+  Original logo studies for Javorna, a fictional Czech luxury bespoke woodworking
+  atelier. The symbol must unmistakably depict a beautiful wooden chair or throne,
+  not a monogram or abstract geometric mark. Quiet European luxury and exceptional
+  craftsmanship, contemporary rather than a furniture-store pictogram.
+  A single complete compact emblem, generous clear space, centered at about
+  62 percent of a square artboard. Flat vector-like graphic, confident silhouettes
+  and only a few carefully chosen internal lines, readable when small.
+  Solid warm ivory background approximately #F4EDE2. Dark natural wood browns,
+  with restrained reddish timber undertones. No gradients, photography, shadows,
+  texture background, embossing, mockups, frames, lettering, initials, brand name,
+  crowns, heraldry, animals, people, watermarks or recognizable existing designs.
+  Exact native 2048x2048. The wordmark will be added separately as editable text.
+size: 2048x2048
+quality: standard
+instances_per_prompt: 1
+max_attempts: 1
+output_dir: ../.local/image-output
+azure: {}
+preferences:
+  detail: Recognizable luxury wooden seating with a distinctive, simple silhouette.
+  realism: Flat identity artwork, not a product photograph or a 3D render.
+  freshness: Same user-selected Microsoft MAI-Image-2.7 version 2026-11-02.
+  cost: Three new images within the existing USD 500 ceiling; one attempt per image, no compiler or references.
+images:
+  - name: walnut-chair
+    description: A - sculptural walnut armchair, refined contemporary craft.
+    prompts:
+      - |
+        Design one sophisticated furniture brand emblem showing a bespoke sculptural
+        walnut armchair in a clear three-quarter view facing slightly to the right.
+        A flowing curved wooden back rail, open negative space under the arms,
+        an elegant gently dished wooden seat and four visually coherent tapering
+        legs. Capture the premium craftsmanship through the proportions and one
+        restrained joinery detail, not woodgrain illustration. The chair must be
+        immediately recognizable; do not reduce it to an abstract J or unrelated
+        symbol. Broad confident dark walnut shapes approximately #40291F, one
+        warmer brown secondary plane. Inviting, balanced, timeless, original.
+  - name: mahogany-throne
+    description: B - architectural high-backed throne, heritage without heraldry.
+    prompts:
+      - |
+        Design one luxury woodworking emblem of an original tall high-backed
+        wooden ceremonial armchair or understated throne, seen directly from the
+        front. Calm strong symmetry, a gently arched sculptural back, two expressive
+        solid wooden arms, a clearly visible seat, two front legs and thoughtful
+        open negative spaces. A restrained central carved inset suggests bespoke
+        architectural joinery. Rich reddish mahogany approximately #522923,
+        mostly one flat dark silhouette with a few ivory cutouts.
+        Noble and substantial but elegant rather than heavy or medieval.
+        No crown, royal insignia, shield, gilt, upholstery or ornate curls.
+        It must read as an exceptional crafted chair, not a castle or letter.
+  - name: oak-lounge
+    description: C - sculptural smoked-oak lounge chair, a modern atelier signature.
+    prompts:
+      - |
+        Design one memorable flat logo emblem of a luxurious handcrafted wooden
+        lounge chair in a distinctive side profile, facing right. A beautifully
+        curved continuous smoked-oak back and low seat, one open triangular
+        negative space below the seat, a gently curved armrest and two grounded
+        legs. The outline should feel like a fine sculptor shaped the timber,
+        with a clear seat and back that remain recognizable as furniture.
+        Confident dark smoked-oak brown approximately #332E27, with a single
+        restrained warm brown plane. Airy, poised, contemporary gallery furniture.
+        Not a rocking chair, folding chair, generic office chair, abstract swoosh
+        or recognizable famous designer's product.
+capability_profiles:
+  - provider: Microsoft
+    model: MAI-Image-2.7
+    version: "2026-11-02"
+    capability:
+      adapter: mai
+      sizes: ["2048x2048"]
+      min_edge: 768
+      max_edge: 2048
+      min_pixels: 589824
+      max_pixels: 4194304
+      alignment: 1
+      max_aspect: 1
+      edit: true
+      max_references: 5
+      qualities: [standard]
+      native_edit_size: false
+      evidence: https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-mai-image
+      checked: "2026-11-22"
+      caveat: "Preview. Only documented 2048 square generation is enabled. The earlier explicitly approved 4K experiment was rejected; no native 4K is claimed."

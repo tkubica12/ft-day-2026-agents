@@ -3,12 +3,14 @@ import importlib.util
 import json
 import hashlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 def load(name, path):
@@ -33,6 +35,60 @@ class Document(HTMLParser):
 
 
 class FoundationTests(unittest.TestCase):
+    def test_furniture_studies_keep_six_static_slides_and_readable_brand_pairs(self):
+        builder = load("furniture", "scripts/build_furniture_review.py")
+        palettes = json.loads((ROOT / "brand/furniture-palettes.json").read_text(encoding="utf-8"))
+        images = {p["image"]: f"brand-candidates/{p['image']}.png" for p in palettes}
+        gallery, deck = builder.build(palettes, images, "brand-candidates/atelier.png")
+        parsed = Document(deck)
+        self.assertEqual(len(parsed.ids), 6)
+        self.assertEqual(len(set(parsed.ids)), 6)
+        self.assertEqual(len(parsed.media), 9)
+        self.assertIn("logo B s paletou A", gallery)
+        self.assertEqual(deck.count("A goal outlives a conversation."), 3)
+        self.assertNotIn("<iframe", gallery)
+
+        def luminance(color):
+            channels = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            linear = [c / 12.92 if c <= .04045 else ((c + .055) / 1.055) ** 2.4 for c in channels]
+            return sum(c * weight for c, weight in zip(linear, (.2126, .7152, .0722)))
+
+        for palette in palettes:
+            for foreground, background in (("paper", "wood"), ("muted", "wood"), ("leaf", "wood"),
+                                           ("wood", "paper"), ("paper", "pine"), ("pine", "paper"),
+                                           ("paper", "deep")):
+                with self.subTest(palette=palette["id"], foreground=foreground, background=background):
+                    values = sorted((luminance(palette[foreground]), luminance(palette[background])))
+                    self.assertGreaterEqual((values[1] + .05) / (values[0] + .05), 4.5)
+
+    def test_review_originals_are_verified_before_copying(self):
+        from PIL import Image
+        from unittest.mock import patch
+        import build_brand_review as review
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            runs = root / "output/runs"
+            runs.mkdir(parents=True)
+            source = root / "output/original.png"
+            Image.new("RGB", (2048, 2048), "white").save(source)
+            original = source.read_bytes()
+            digest = hashlib.sha256(original).hexdigest()
+            manifest = {"run_id": "test", "summary": {"failed": 0}, "records": [{
+                "lineage": {"image": "chair"}, "original": "original.png", "image_sha256": digest
+            }]}
+            path = runs / "test.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with patch.object(review, "ROOT", root):
+                _, images = review.load_images(path, {"chair"})
+                self.assertEqual((root / "docs" / images["chair"]).read_bytes(), original)
+                with self.assertRaises(ValueError):
+                    review.load_images(path, {"chair", "missing"})
+                source.write_bytes(b"corrupted")
+                with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                    review.load_images(path, {"chair"})
+                self.assertEqual((root / "docs" / images["chair"]).read_bytes(), original)
+
     def test_cutter_preserves_source_and_encodes_real_segments(self):
         cutter = load("cutter_integration", "video-production/build_clips.py")
         with tempfile.TemporaryDirectory() as temp:

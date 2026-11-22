@@ -17,6 +17,8 @@ docs/video/*
 docs/screenshots/
 docs/brand-candidates/
 docs/brand-review.html
+docs/furniture-review.html
+docs/furniture-slides.html
 brand/output/
 brand/*.local.*
 validation/

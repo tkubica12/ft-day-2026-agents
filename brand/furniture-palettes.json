@@ -1,0 +1,41 @@
+[
+  {
+    "id": "A",
+    "image": "walnut-chair",
+    "name": "Walnut & leaf",
+    "label": "Ořech a listí",
+    "description": "Sochařské křeslo, teplý ořech a svěží listová zeleň. Kultivovaný, současný a příjemný směr.",
+    "wood": "#40291F",
+    "deep": "#241B17",
+    "paper": "#F4EDE2",
+    "muted": "#D7C5AE",
+    "leaf": "#AEC792",
+    "pine": "#365440"
+  },
+  {
+    "id": "B",
+    "image": "mahogany-throne",
+    "name": "Mahogany & spruce",
+    "label": "Mahagon a smrk",
+    "description": "Reprezentativní trůn, červenohnědý mahagon a chladnější smrková zeleň. Slavnostnější, výrazně luxusní charakter.",
+    "wood": "#522923",
+    "deep": "#321B19",
+    "paper": "#F5EADF",
+    "muted": "#DAC2AD",
+    "leaf": "#9FC2B3",
+    "pine": "#254D40"
+  },
+  {
+    "id": "C",
+    "image": "oak-lounge",
+    "name": "Smoked oak & fern",
+    "label": "Kouřový dub a kapradí",
+    "description": "Designová lenoška v bočním profilu, tmavý kouřový dub a živá kapradinová zeleň. Minimalistický ateliér s odvážnějším kontrastem.",
+    "wood": "#332E27",
+    "deep": "#211F1A",
+    "paper": "#EEEBDD",
+    "muted": "#CFCCB6",
+    "leaf": "#BCCB7A",
+    "pine": "#4C6138"
+  }
+]

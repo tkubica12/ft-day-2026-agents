@@ -1,0 +1,70 @@
+/* Opt-in, unapproved brand studies. Canonical runtime/UI tokens stay unchanged. */
+.furniture-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.furniture-option{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+.furniture-option .option-copy{padding:22px}
+.furniture-option h2{font-size:24px;margin:0 0 12px}
+.furniture-option p{font-size:17px;color:var(--text-muted)}
+.furniture-option .option-mark{display:block;width:100%;height:240px;object-fit:contain;background:#F4EDE2}
+.palette-strip{display:flex;height:25px}
+.palette-strip span{flex:1}
+.palette-list{display:flex;flex-wrap:wrap;gap:12px 24px;margin:24px 0 30px;font-size:14px}
+.palette-list span{display:inline-flex;align-items:center;gap:8px}
+.palette-list i{display:inline-block;width:20px;height:20px;border:1px solid var(--border);border-radius:50%}
+.review-direction{margin-top:76px;scroll-margin-top:72px}
+.review-direction>h2{font-size:34px;margin-bottom:10px}
+.review-direction>p{max-width:760px}
+.study-caption{display:flex;justify-content:space-between;gap:20px;margin:32px 0 14px}
+.study-caption h3{margin:0;font-size:18px}
+.study-caption a{font-size:15px}
+.study-frame{position:relative;width:100%;aspect-ratio:16/9;container-type:inline-size;overflow:hidden;
+  background:var(--wood);color:var(--paper);font-family:"Segoe UI",Arial,sans-serif;line-height:1.35}
+.study-frame *{box-sizing:border-box}
+.study-frame p,.study-frame h2,.study-frame h3{margin:0}
+.study-frame .sample-kicker{font-size:1.25cqw;letter-spacing:.16em;text-transform:uppercase;font-weight:650}
+.study-frame .sample-lockup{display:flex;align-items:center;gap:1.5cqw}
+.study-frame .sample-mark{display:block;width:7.5cqw;height:7.5cqw;object-fit:contain;background:#F4EDE2}
+.study-frame .sample-wordmark{font:400 2.15cqw Georgia,"Times New Roman",serif;letter-spacing:.15em}
+.study-frame .sample-wordmark small{display:block;font:500 .85cqw "Segoe UI",Arial,sans-serif;letter-spacing:.19em;margin-top:.5cqw}
+.study-frame .title-copy{position:absolute;inset:0 41% 0 0;padding:4.5cqw 4.8cqw}
+.study-frame .title-heading{font:400 4.6cqw/1.06 Georgia,"Times New Roman",serif;letter-spacing:-.035em;margin:4cqw 0 2cqw;color:var(--paper)}
+.study-frame .title-heading em{font-style:normal;color:var(--leaf)}
+.study-frame .title-sub{font-size:1.7cqw;color:var(--muted);line-height:1.55;max-width:27cqw}
+.study-frame .title-photo{position:absolute;inset:0 0 0 59%;width:41%;height:100%;object-fit:cover;object-position:70% center}
+.study-frame .title-bottom{position:absolute;left:4.8cqw;bottom:4cqw;font-size:1.25cqw;color:var(--muted)}
+.study-frame .title-bottom strong{font-weight:600;color:var(--paper)}
+.study-frame .sample-tag{position:absolute;right:2cqw;bottom:2cqw;padding:.5cqw .8cqw;background:var(--deep);color:var(--paper);
+  font-size:.85cqw;letter-spacing:.08em}
+.study-frame.sample-content{background:var(--paper);color:var(--wood);padding:4.5cqw 4.8cqw}
+.study-frame .content-top{display:flex;align-items:center;justify-content:space-between}
+.study-frame .content-top .sample-mark{width:4.5cqw;height:4.5cqw}
+.study-frame .content-top .sample-wordmark{font-size:1.65cqw}
+.study-frame .content-top .sample-kicker{color:var(--pine)}
+.study-frame .content-heading{font:400 4cqw/1.1 Georgia,"Times New Roman",serif;margin:3.3cqw 0 3cqw;letter-spacing:-.025em;color:var(--wood)}
+.study-frame .country-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2cqw}
+.study-frame .country-card{padding:2.5cqw 1.8cqw;border:1px solid var(--wood);border-radius:0}
+.study-frame .country-card h3{font-size:2.5cqw;font-weight:600;margin:0 0 1.4cqw}
+.study-frame .country-card p{font-size:2.1cqw;line-height:1.5}
+.study-frame .sample-note{position:absolute;left:4.8cqw;right:4.8cqw;bottom:5cqw;padding:1.5cqw 2cqw;background:var(--pine);color:var(--paper);
+  display:flex;align-items:center;gap:2cqw;font-size:1.8cqw}
+.study-frame .sample-note strong{font-weight:650}
+.study-frame .sample-foot{position:absolute;left:4.8cqw;bottom:1.7cqw;font-size:1cqw;color:var(--wood)}
+.furniture-slide.slide{padding:0}
+.furniture-slide>.study-frame{height:100%;flex-shrink:0}
+.review-direction .study-frame{border:1px solid var(--border)}
+@media(max-width:800px){
+  .furniture-options{gap:12px}
+  .furniture-option .option-copy{padding:15px}
+  .furniture-option h2{font-size:19px}
+  .furniture-option p{font-size:15px}
+  .furniture-option .option-mark{height:180px}
+}
+@media(max-width:560px){
+  .furniture-options{grid-template-columns:1fr}
+  .furniture-option .option-mark{height:250px}
+  .study-caption{display:block}
+}
+@media print{
+  .review-direction{break-before:page}
+  .study-frame{break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .study-caption a{display:none}
+}

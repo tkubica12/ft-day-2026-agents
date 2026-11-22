@@ -14,19 +14,21 @@ def theme(palette):
 
 
 def lockup(image, subtitle=False):
+    dimensions = 'width="357" height="367.25"' if image.endswith(".svg") else 'width="2048" height="2048"'
     return (
         '<div class="sample-lockup">'
-        f'<img class="sample-mark" src="{esc(image)}" width="2048" height="2048" alt="Javorna furniture logo concept">'
+        f'<img class="sample-mark" src="{esc(image)}" {dimensions} alt="Javorna furniture logo">'
         '<div class="sample-wordmark">JAVORNA'
         + ('<small>BESPOKE WOODWORK</small>' if subtitle else '')
         + '</div></div>'
     )
 
 
-def study(palette, images, hero, content=False):
+def study(palette, images, hero, content=False, approved=False):
     letter, name = palette["id"], palette["name"]
     logo = images[palette["image"]]
-    opening = f'<div class="study-frame{" sample-content" if content else ""}" style="{theme(palette)}">'
+    opening = f'<div class="study-frame{" sample-content" if content else ""}{" javorna" if approved else ""}" style="{theme(palette)}">'
+    tag = "" if approved else f'<p class="sample-tag">{esc(letter)} · {esc(name)}</p>'
     if not content:
         return (
             opening
@@ -36,7 +38,7 @@ def study(palette, images, hero, content=False):
             + '<h2 class="title-heading">Craft takes people.<br>Coordination<br>takes <em>Otto.</em></h2>'
             '<p class="title-sub">One budget season.<br>Four countries. Clear boundaries.</p>'
             '<p class="title-bottom"><strong>Tomáš Kubica · Microsoft</strong><br>Frontier Day 2026</p></div>'
-            f'<p class="sample-tag">{esc(letter)} · {esc(name)}</p></div>'
+            + tag + '</div>'
         )
     return (
         opening
@@ -49,7 +51,7 @@ def study(palette, images, hero, content=False):
         '<div class="country-card"><h3>Next step</h3><p>Emma prepares<br>challenge sessions</p></div></div>'
         '<p class="sample-note"><strong>Otto coordinates.</strong> People keep the decision rights.</p>'
         '<p class="sample-foot">Javorna Group · fictional scenario</p>'
-        f'<p class="sample-tag">{esc(letter)} · {esc(name)}</p></div>'
+        + tag + '</div>'
     )
 
 

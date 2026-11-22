@@ -16,7 +16,7 @@ amounts, projects and process events in this repository are synthetic.
 - `docs/demo-guide.html`: concise operator guide; prompts and expected results.
 - `video-production/`: EDL-based FFmpeg cutter; raw recordings remain immutable.
 - `.github/skills/`: portable HTML/image authoring skills and local recording/playbook skills.
-- `brand/`: image briefs. Unapproved generated candidates and their manifests stay local.
+- `brand/`: image briefs and the selected identity record. Unapproved generated candidates and their manifests stay local.
 
 There are **no recordings, screenshots, provisioned accounts or running agent
 services** in this foundation. Recording slots are placeholders, not evidence of
@@ -91,7 +91,43 @@ candidates; prepare each like the furniture brief, then run
 It builds local `docs/logo-review.html` (three finalists at 128/64/32 px, A4,
 square and announcement Teams widget mockups, and all 16 iterations) and
 `docs/logo-slides.html`. Check it with `node tests\check_logo_browser.cjs`.
-Nothing is approved until the user selects a finalist.
+These galleries remain a historical record of the selection process.
+
+### Selected identity: chair 3, palette C
+
+The selected chair now uses transparent SVG instead of a beige square:
+`docs/assets/javorna/chair.svg` for pale surfaces and `chair-on-dark.svg` for
+dark oak. Both have identical geometry in five colour layers (7,932 bytes
+each); the reverse version lightens the materials, not the background.
+The untouched approved PNG and atelier photo are preserved alongside them.
+`brand/identity.json` records selection, hashes and adaptation review status.
+
+Keep the mark free of tiles, frames and shadows, with clear space around it.
+Use 64 px or larger when possible; 32 px stays recognizable but loses detail.
+The main presentation and guide use the selected brand profile. The shared
+document runtime and canonical UI tokens are unchanged.
+
+```powershell
+python scripts\build_docs.py
+python scripts\build_vector_review.py
+node tests\check_vector_browser.cjs
+```
+
+This creates `docs/vector-review.html`, `docs/vector-slides.html` and three
+self-contained offline widget previews under `docs/widgets/`. The widgets
+contain only SVG data images, readable HTML data, CSS and visual action
+placeholders: no photos, scripts or live actions. The small growth-ring motif
+demonstrates the recommended decorative vocabulary. All three previews are
+below 24 KB including base64-encoded SVG and CSS; live gateway/Teams delivery
+is not implemented or verified by this design work.
+
+Optional trace reproduction (requires existing Pillow, NumPy and OpenCV):
+`python scripts\vectorize_chair.py docs\assets\javorna\chair-original.png`.
+The source hash is checked before tracing. The fidelity test renders the SVG
+at the original size and requires over 99% silhouette overlap, including
+transparent joinery openings. The independent visual judge accepted the light
+redraw and, after a contrast correction, the dark variant at 64 px and larger.
+The vector adaptation remains available for the user's visual sign-off.
 
 ## Runtime boundary
 

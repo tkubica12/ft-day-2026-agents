@@ -1,0 +1,28 @@
+{
+  "company": "Javorna Group",
+  "fictional": true,
+  "palette": "C",
+  "selected_logo": "3 - Kreslo / r2-d2-cushion",
+  "user_selection_date": "2026-11-22",
+  "original": "docs/assets/javorna/chair-original.png",
+  "original_sha256": "f0f04939aed657e9d996b9c8e578ee3369967dec05b4c29925ae67bcd48887df",
+  "colour": "docs/assets/javorna/chair.svg",
+  "on_dark": "docs/assets/javorna/chair-on-dark.svg",
+  "decorative_motif": "docs/assets/javorna/growth-rings.svg",
+  "atelier": "docs/assets/javorna/atelier.png",
+  "atelier_sha256": "ed2912c5014ea1d17cd940ecaa457eb3ecd9bf4aa474ddbd0148245bf0908ebd",
+  "adaptation": {
+    "method": "Five flat material colours; fitted vector curves; transparent background and openings.",
+    "on_dark": "Identical geometry with lighter oak and muted green for dark surfaces.",
+    "independent_review": "Light fidelity accepted; initial dark contrast rejected; corrected dark variant accepted at 64px+.",
+    "user_visual_signoff": "pending",
+    "original_bytes_preserved": true
+  },
+  "usage": {
+    "minimum_preferred_width_px": 64,
+    "smallest_preview_width_px": 32,
+    "clear_space": "At least 20% of the mark width; no surrounding tile, border or shadow.",
+    "widget_delivery": "Trusted gateway injects approved SVG as data:image/svg+xml; not model-authored paths.",
+    "widget_runtime_status": "Local mockups only; Teams deployment and live message limits not verified."
+  }
+}

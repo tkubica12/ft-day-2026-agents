@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -36,6 +37,46 @@ class Document(HTMLParser):
 
 
 class FoundationTests(unittest.TestCase):
+    def test_chair_is_compact_transparent_vector_with_identical_reverse_geometry(self):
+        from PIL import Image
+        import numpy as np
+
+        assets = ROOT / "docs/assets/javorna"
+        variants = [(assets / name).read_bytes() for name in ("chair.svg", "chair-on-dark.svg")]
+        trees = [ET.fromstring(svg) for svg in variants]
+        for svg, tree in zip(variants, trees):
+            self.assertLess(len(svg), 10_000)
+            self.assertEqual({el.tag.split("}")[-1] for el in tree.iter()}, {"svg", "title", "path"})
+            self.assertNotIn(b"data:", svg)
+        self.assertEqual([p.attrib["d"] for p in trees[0] if p.tag.endswith("path")],
+                         [p.attrib["d"] for p in trees[1] if p.tag.endswith("path")])
+        source = assets / "chair-original.png"
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),
+                         "f0f04939aed657e9d996b9c8e578ee3369967dec05b4c29925ae67bcd48887df")
+        subprocess.run(["node", str(ROOT / "tests/render_chair.cjs")], check=True)
+        raster = np.asarray(Image.open(source).convert("RGB"))
+        vector = np.asarray(Image.open(ROOT / ".local/vector-shots/vector-native.png").convert("RGBA"))
+        original_mask = raster.min(axis=2) < 190
+        vector_mask = vector[:, :, 3] > 127
+        overlap = (original_mask & vector_mask).sum() / (original_mask | vector_mask).sum()
+        self.assertGreater(overlap, .99, "silhouette including the open joinery must match the approved source")
+        self.assertEqual(int(vector[0, 0, 3]), 0, "no rectangular background")
+        self.assertEqual(int(vector[860, 1390, 3]), 0, "armrest opening must remain transparent")
+
+    def test_widget_exports_embed_only_svg_and_fit_html_budget(self):
+        builder = load("vector_review", "scripts/build_vector_review.py")
+        for name, markup in builder.widgets():
+            with self.subTest(widget=name):
+                document = builder.widget_file(markup)
+                self.assertLess(len(document.encode("utf-8")), 48_000)
+                media = Document(document).media
+                self.assertGreater(len(media), 0)
+                self.assertTrue(all(m["src"].startswith("data:image/svg+xml;base64,") for m in media))
+                self.assertNotIn("<script", document)
+                self.assertIn("img-src data:", document)
+        with self.assertRaisesRegex(ValueError, "only approved local SVG"):
+            builder.inline_svg_images('<img src="assets/javorna/atelier.png">')
+
     def test_furniture_studies_keep_six_static_slides_and_readable_brand_pairs(self):
         builder = load("furniture", "scripts/build_furniture_review.py")
         palettes = json.loads((ROOT / "brand/furniture-palettes.json").read_text(encoding="utf-8"))
@@ -161,7 +202,9 @@ class FoundationTests(unittest.TestCase):
         for text in (deck, guide):
             parsed = Document(text)
             self.assertEqual(len(parsed.ids), len(set(parsed.ids)))
-            self.assertEqual(parsed.media, [])
+            self.assertTrue(all(m["src"].startswith("assets/javorna/") for m in parsed.media))
+            self.assertNotIn("<video", text)
+            self.assertNotIn("brand-candidates/", text)
             self.assertIn("Not recorded yet" if text == deck else "pending", text)
 
     def test_edl_rejects_unsafe_or_misleading_segments(self):

@@ -1,0 +1,42 @@
+/* Explicit Javorna brand profile. Shared document UI tokens remain untouched. */
+.javorna{--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138;--oak:#6B5A45}
+.javorna .j-mark,.study-frame.javorna .sample-mark,.javorna.widget .w-mark{
+  display:block;object-fit:contain;background:transparent;border:0;border-radius:0;box-shadow:none;
+  aspect-ratio:357/367.25;flex:none}
+.study-frame.javorna .sample-lockup{gap:1.7cqw}
+.study-frame.javorna .sample-mark{width:7cqw;height:auto}
+.study-frame.javorna .content-top .sample-mark{width:4.5cqw;height:auto}
+.study-frame.javorna .sample-wordmark{letter-spacing:.18em}
+.javorna.widget .w-mark{width:8cqw;height:auto}
+.javorna .j-lockup{display:flex;align-items:center;gap:18px;font:24px Georgia,"Times New Roman",serif;letter-spacing:.18em}
+.javorna .j-lockup small{display:block;font:10px "Segoe UI",sans-serif;letter-spacing:.2em;margin-top:5px}
+.javorna .j-lockup .j-mark{width:52px;height:auto}
+.javorna .slide:not(.furniture-slide){background:var(--paper);color:var(--wood);padding:44px 62px 48px}
+.javorna .slide>.j-lockup{margin-bottom:24px;flex-shrink:0}
+.javorna .slide .slide-title{font:44px/1.15 Georgia,"Times New Roman",serif;color:var(--wood);letter-spacing:-.025em}
+.javorna .slide .slide-head{margin-bottom:28px;border-color:var(--muted)}
+.javorna .slide .slide-body{color:var(--wood)}
+.javorna .slide .slide-lead{color:var(--oak)}
+.javorna .slide .slide-note{color:var(--oak)}
+.javorna .slide table th{color:var(--pine);background:transparent;border-color:var(--oak)}
+.javorna .slide table td{border-color:var(--muted)}
+.javorna .slide table tr{background:transparent}
+.javorna .slide .callout{background:transparent;border-color:var(--pine);color:var(--wood)}
+.javorna .slide .callout-label{color:var(--pine)}
+.javorna .slide .arrow-list>li::before{color:var(--pine)}
+.javorna .slide:is(.slide--section,.slide--end){background:var(--wood);color:var(--paper)}
+.javorna .slide:is(.slide--section,.slide--end) .j-lockup{position:absolute;top:44px;left:62px;color:var(--paper)}
+.javorna .slide:is(.slide--section,.slide--end) h2{color:var(--paper);font-family:Georgia,"Times New Roman",serif}
+.javorna .slide:is(.slide--section,.slide--end) .slide-note{color:var(--muted)}
+.javorna .slide:is(.slide--section,.slide--end) .slide-lead{color:var(--muted)}
+.javorna .slide--end>p{font-family:Georgia,"Times New Roman",serif;color:var(--paper)}
+.javorna .slide--end::before{background:var(--leaf)}
+.javorna.doc .doc-header{background:var(--paper);color:var(--wood);padding:36px;border-top:5px solid var(--pine)}
+.javorna.doc .doc-header .j-lockup{margin-bottom:32px}
+.javorna.doc .doc-header h1{color:var(--wood);font-family:Georgia,"Times New Roman",serif}
+.javorna.doc .doc-header .subtitle,.javorna.doc .doc-header p{color:var(--oak)}
+.javorna.widget-announce .w-photo-copy{background:var(--wood)}
+.javorna.widget-announce .w-photo-copy .w-title{position:relative;max-width:85%}
+.javorna .j-growth{position:absolute;width:35%;height:auto;right:3%;top:4%;opacity:.25}
+@media(max-width:560px){.javorna.doc .doc-header{padding:24px}.javorna .j-lockup{font-size:20px}}
+@media print{.javorna,.javorna .slide{print-color-adjust:exact;-webkit-print-color-adjust:exact}}

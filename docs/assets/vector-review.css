@@ -1,0 +1,23 @@
+.vector-pair{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.vector-tile{padding:34px;background:#EEEBDD;color:#332E27}
+.vector-tile.dark{background:#332E27;color:#EEEBDD}
+.vector-lockup{display:flex;gap:26px;align-items:center;margin-bottom:40px}
+.vector-lockup>img{width:110px;height:auto}
+.vector-lockup>span{font:28px Georgia,"Times New Roman",serif;letter-spacing:.17em}
+.vector-lockup small{display:block;font:10px "Segoe UI",sans-serif;letter-spacing:.2em;margin-top:8px}
+.vector-tile h2{font-size:22px}
+.vector-tile p{font-size:16px;line-height:1.5}
+.vector-sizes{display:flex;align-items:end;gap:28px;margin-top:32px}
+.vector-sizes span{display:flex;flex-direction:column;gap:12px;font:12px "Segoe UI",sans-serif}
+.vector-sizes img{display:block}
+.vector-facts{font-size:15px;color:var(--text-muted);margin-top:20px}
+.vector-original{margin-top:30px}
+.vector-original summary{cursor:pointer;font-weight:600}
+.vector-compare{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.vector-compare figure{position:relative;margin:20px 0;background:#FAF5EF}
+.vector-compare img{display:block;width:100%;height:auto}
+.vector-compare .vector-aligned{width:69.7265625%;margin:15.185546875% 14.208984375% 13.0859375% 16.064453125%}
+.vector-compare figcaption{padding:15px;font-size:14px;color:#332E27}
+@media(max-width:800px){.vector-pair{grid-template-columns:1fr}.vector-lockup>span{font-size:24px}}
+@media(max-width:560px){.vector-tile{padding:24px}.vector-lockup{gap:20px}.vector-lockup>img{width:86px}.vector-compare{grid-template-columns:1fr}}
+@media print{.vector-tile{break-inside:avoid;print-color-adjust:exact}.vector-original:not([open]){display:none}}

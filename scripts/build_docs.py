@@ -24,10 +24,19 @@ def head(template, title, doc_id):
 
 def slide(identity, title, body, note=""):
     return (
-        f'<section class="slide" id="s-{esc(identity)}">'
+        f'<section class="slide" id="s-{esc(identity)}">{brand_lockup()}'
         f'<div class="slide-head"><h2 class="slide-title">{esc(title)}</h2></div>'
         f'<div class="slide-body">{body}</div>'
         f'<p class="slide-note">{esc(note)}</p></section>\n'
+    )
+
+
+def brand_lockup(dark=False):
+    image = "chair-on-dark.svg" if dark else "chair.svg"
+    return (
+        '<div class="j-lockup">'
+        f'<img class="j-mark" src="assets/javorna/{image}" width="357" height="367.25" alt="Javorna armchair">'
+        '<span>JAVORNA</span></div>'
     )
 
 
@@ -43,16 +52,21 @@ def card(identity, title, body):
 
 
 def build(data):
+    from build_furniture_review import study
+
+    palette = next(p for p in json.loads((ROOT / "brand/furniture-palettes.json").read_text(encoding="utf-8"))
+                   if p["id"] == "C")
+    palette = {**palette, "image": "chair"}
+    styles = ('<link rel="stylesheet" href="assets/furniture-review.css">'
+              '<link rel="stylesheet" href="assets/javorna-brand.css">')
     deck = head("deck.template.html", "Otto at Javorna — Frontier Day 2026", "ft2026-deck")
-    deck += '<main class="deck-stage">\n'
-    deck += (
-        '<section class="slide slide--title" id="s-title">'
-        '<p class="slide-meta">FRONTIER DAY 2026 · JAVORNA GROUP</p>'
-        '<h1>Craft takes people.<br>Coordination takes Otto.</h1>'
-        '<p class="slide-sub">One budget season. Four countries. A digital colleague with clear boundaries.</p>'
-        f'<p class="slide-meta">{esc(data["presenter"])}</p>'
-        '<p class="slide-note">Fictional company and data · recording skeleton</p></section>\n'
-    )
+    deck = deck.replace("</head>", styles + "</head>")
+    deck += '<main class="deck-stage javorna">\n'
+    title = study(palette, {"chair": "assets/javorna/chair-on-dark.svg"},
+                  "assets/javorna/atelier.png", approved=True)
+    title = title.replace("Tomáš Kubica · Microsoft", esc(data["presenter"]))
+    title = title.replace('<h2 class="title-heading">', '<h1 class="title-heading">').replace('</h2>', '</h1>')
+    deck += f'<section class="slide furniture-slide" id="s-title">{title}</section>\n'
     deck += slide("company", "Bespoke work needs shared planning",
                   '<p>Luxury furniture. Architectural joinery. Artistic woodwork.</p>'
                   '<p>Homes, offices and representative spaces; church, restoration and film commissions.</p>'
@@ -68,7 +82,7 @@ def build(data):
         sid = scene["id"]
         if sid == "09":
             deck += (
-                '<section class="slide slide--section" id="s-week-three">'
+                f'<section class="slide slide--section" id="s-week-three">{brand_lockup(dark=True)}'
                 '<h2>Two weeks later</h2><p class="slide-lead">The same goal. New work.</p>'
                 '<p class="slide-note">Explicit simulated time jump to week 3</p></section>\n'
             )
@@ -83,11 +97,12 @@ def build(data):
                   '<li>Coordination crosses people, channels and weeks.</li>'
                   '<li>Decisions and learning retain human ownership.</li></ul>')
     deck += (
-        '<section class="slide slide--end" id="s-end">'
+        f'<section class="slide slide--end" id="s-end">{brand_lockup(dark=True)}'
         '<p>Delegate the work.<br>Keep the authority.</p></section>\n</main></body></html>\n'
     )
 
     guide = head("article.template.html", "Javorna — demo recording guide", "ft2026-guide")
+    guide = guide.replace("</head>", '<link rel="stylesheet" href="assets/javorna-brand.css"></head>')
     guide += (
         '<div class="controls" role="group" aria-label="Guide controls">'
         '<button type="button" class="ctrl" data-action="expand-all">Expand all</button>'
@@ -96,7 +111,7 @@ def build(data):
         '<button type="button" class="ctrl" data-action="toggle-print-theme">PDF theme: Light</button>'
         '<button type="button" class="ctrl" data-action="toggle-theme">Dark</button>'
         '<button type="button" class="ctrl" data-action="toggle-accent">Accent: Green</button></div>'
-        '<div class="doc"><header class="doc-header" id="opening">'
+        f'<div class="doc javorna"><header class="doc-header" id="opening">{brand_lockup()}'
         '<p class="eyebrow">FRONTIER DAY 2026 · RECORDING GUIDE</p>'
         '<h1>Otto runs Javorna’s budget season</h1>'
         '<p class="subtitle">Copy the messages. Record the real outcomes. Keep country figures private.</p>'

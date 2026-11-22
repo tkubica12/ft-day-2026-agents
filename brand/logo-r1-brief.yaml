@@ -1,0 +1,119 @@
+common_requirements: |
+  Original logo study for Javorna, a fictional Czech atelier for luxury bespoke
+  wooden furniture. Refinement of an approved direction: a sculptural smoked-oak
+  lounge chair. The symbol must unmistakably depict one beautiful wooden chair.
+  Structural honesty is mandatory: every part is physically supported and
+  buildable by a master cabinetmaker. Nothing ends in mid-air, no floating
+  armrest, no disconnected stroke, no impossible joint, no extra or missing legs.
+  A single complete compact emblem, centered, occupying about 60 percent of a
+  square artboard with generous clear space. Flat vector identity artwork with
+  confident shapes and only a few deliberate internal lines, legible at 32 pixels.
+  Solid flat pale stone-ivory background approximately #EEEBDD. Dark smoked-oak
+  brown approximately #332E27; optional secondary tones are a warmer mid oak
+  brown approximately #6B5A45 and a deep pine green approximately #4C6138.
+  No gradients, photography, shadows, floor line, texture, embossing, mockup,
+  frame, lettering, initials, brand name, crown, heraldry, people, animals,
+  plants, watermark or recognizable existing designer chair.
+  Exact native 2048x2048. The wordmark will be added separately as editable text.
+size: 2048x2048
+quality: standard
+instances_per_prompt: 1
+max_attempts: 1
+output_dir: ../.local/image-output
+azure: {}
+preferences:
+  detail: Structurally logical luxury lounge chair, simple enough for a logo.
+  realism: Flat identity artwork, not a product photograph or a 3D render.
+  freshness: Same user-selected Microsoft MAI-Image-2.7 version 2026-11-02.
+  cost: Six images, round 1 of a bounded self-critique loop within the existing USD 500 ceiling; one attempt each, no compiler or references.
+images:
+  - name: r1-s1-ribbon
+    description: Schematic side profile, no arms, continuous bent-wood back and seat.
+    prompts:
+      - |
+        Pure side profile facing right of an elegant low lounge chair WITHOUT
+        armrests. One continuous thick bent-wood ribbon forms a gently reclined
+        back flowing into a deep seat. A rear leg rises diagonally and visibly
+        carries the back and seat; a slim front leg sits directly under the
+        front of the seat. Both legs touch the same invisible ground level.
+        Mostly one flat smoked-oak silhouette with one thin ivory reveal line
+        separating seat from frame. Calm, poised, gallery-like, very simple.
+  - name: r1-s2-planks
+    description: Schematic side profile, no arms, two planks and an honest frame.
+    prompts:
+      - |
+        Pure side profile facing right of a refined wooden lounge chair WITHOUT
+        armrests, drawn as a clear joinery diagram turned into a luxury emblem.
+        A curved backrest plank and a slightly dished seat plank, separated by a
+        narrow ivory gap. The rear leg continues upward in one piece as the back
+        support, the front leg is a tapered post under the seat front, and a slim
+        side rail joins them below the seat. Smoked-oak brown frame, the seat and
+        back plank in warmer mid oak brown. Precise, architectural, timeless.
+  - name: r1-s3-shell
+    description: Schematic side profile, no arms, oak frame with a pine-green cushion.
+    prompts:
+      - |
+        Pure side profile facing right of a sculptural low lounge chair WITHOUT
+        armrests. A smoked-oak wooden frame with a raked rear leg continuing into
+        the back support and a slim front leg under the seat. Resting on the frame,
+        one soft continuous upholstered seat-and-back cushion in deep pine green,
+        clearly supported along its whole length by the wooden frame.
+        Simple flat shapes, a single ivory reveal between cushion and wood.
+        Natural, calm, quietly luxurious, instantly readable as a chair.
+  - name: r1-d1-frame
+    description: Three-quarter view, armrests supported by front legs, four legs.
+    prompts:
+      - |
+        Three-quarter view from the front left of a handcrafted Scandinavian-style
+        wooden lounge armchair, simplified into a flat two-tone emblem. All four
+        tapered legs are visible and stand on one common ground plane. Each front
+        leg rises above the seat and becomes the front of its armrest; each
+        armrest runs back and is joined to the rear post of the back frame, so
+        both arms are fully supported at both ends. A gently curved backrest
+        between the rear posts, a clear seat. Near side in dark smoked oak,
+        far side and inner faces in warmer mid oak brown to show depth through
+        flat planes only. Balanced, believable, luxurious, minimal detail.
+  - name: r1-d2-cushion
+    description: Three-quarter view, oak frame armchair with pine-green cushions.
+    prompts:
+      - |
+        Three-quarter view from the front right of an exquisite bespoke lounge
+        armchair, rendered as a flat graphic emblem. A sculpted smoked-oak frame:
+        four visible tapered legs on one common ground plane, front legs rising
+        continuously into the armrests, armrests flowing back into the rear posts
+        that hold the back. A thick seat cushion and a back cushion in deep pine
+        green, held clearly inside the frame. Two oak tones for depth, flat planes,
+        no shading. Must look structurally sound and comfortable, every element
+        supported.
+  - name: r1-d3-sideframe
+    description: Near side profile, closed side frame, far legs just visible.
+    prompts:
+      - |
+        A nearly side-on view facing right, rotated just enough that the two far
+        legs appear slightly offset behind the two near legs, of a sculptural
+        smoked-oak lounge armchair. On each side, the armrest, front leg, rear
+        leg and a low side stretcher form one continuous closed wooden frame, so
+        the armrest is supported at both ends and nothing floats. A gently
+        reclined curved back panel and a low deep seat sit inside the frames.
+        Near frame dark smoked oak, far frame warmer mid oak brown, back and seat
+        flat dark planes with thin ivory reveals. Elegant, calm, iconic.
+capability_profiles:
+  - provider: Microsoft
+    model: MAI-Image-2.7
+    version: "2026-11-02"
+    capability:
+      adapter: mai
+      sizes: ["2048x2048"]
+      min_edge: 768
+      max_edge: 2048
+      min_pixels: 589824
+      max_pixels: 4194304
+      alignment: 1
+      max_aspect: 1
+      edit: true
+      max_references: 5
+      qualities: [standard]
+      native_edit_size: false
+      evidence: https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-mai-image
+      checked: "2026-11-22"
+      caveat: "Preview. Only documented 2048 square generation is enabled. The earlier explicitly approved 4K experiment was rejected; no native 4K is claimed."

@@ -1,0 +1,101 @@
+common_requirements: |
+  Original logo study for Javorna, a fictional Czech atelier for luxury bespoke
+  wooden furniture. Refinement of an approved direction: a sculptural smoked-oak
+  lounge chair. The symbol must unmistakably depict one beautiful wooden chair.
+  Structural honesty is mandatory: every part is physically supported and
+  buildable by a master cabinetmaker. Nothing ends in mid-air, no floating
+  armrest, no disconnected stroke, no impossible joint, no extra or missing legs.
+  A single complete compact emblem, centered, occupying about 60 percent of a
+  square artboard with generous clear space. Flat vector identity artwork with
+  confident shapes and only a few deliberate internal lines, legible at 32 pixels.
+  Isolated object only: no ground plane, floor band, rug, pedestal or colored block.
+  Solid flat pale stone-ivory background approximately #EEEBDD. Dark smoked-oak
+  brown approximately #332E27; optional secondary tones are a warmer mid oak
+  brown approximately #6B5A45 and a deep pine green approximately #4C6138.
+  No gradients, photography, shadows, floor line, texture, embossing, mockup,
+  frame, lettering, initials, brand name, crown, heraldry, people, animals,
+  plants, watermark or recognizable existing designer chair.
+  Exact native 2048x2048. The wordmark will be added separately as editable text.
+size: 2048x2048
+quality: standard
+instances_per_prompt: 1
+max_attempts: 1
+output_dir: ../.local/image-output
+azure: {}
+preferences:
+  detail: Refines round-2 winners r2-s1-ribbon, r2-s2-planks-pine and r2-d2-cushion; structurally logical luxury lounge chair, simple enough for a logo.
+  realism: Flat identity artwork, not a product photograph or a 3D render.
+  freshness: Same user-selected Microsoft MAI-Image-2.7 version 2026-11-02.
+  cost: Four images, round 3 of a bounded self-critique loop within the existing USD 500 ceiling; one attempt each, no compiler or references.
+images:
+  - name: r3-d2-oak
+    description: Round-2 armchair structure, all wood, two flat tones.
+    prompts:
+      - |
+        Three-quarter view from the front left of an exquisite bespoke solid wood
+        lounge armchair, flat graphic emblem. Exactly four tapered legs: two front
+        and two rear, all visible. Each front leg continues upward in one piece
+        and curves into its armrest; each armrest runs back and joins the rear
+        post of the back frame, so both arms are supported at both ends. A gently
+        dished wooden seat and a reclined curved wooden backrest panel in warm mid
+        oak brown, held inside the frame. Near frame parts dark smoked oak, far and
+        inner faces warm mid oak brown. Flat planes, no tonal shading, thin ivory
+        reveals. Isolated on the ivory background.
+  - name: r3-d2-bold
+    description: Round-2 armchair simplified to bold flat shapes for small sizes.
+    prompts:
+      - |
+        Three-quarter view from the front left of a bespoke wooden lounge armchair,
+        reduced to a bold minimal flat emblem that stays legible at 32 pixels.
+        Exactly four thick tapered legs: two front and two rear, all visible. Each
+        front leg continues upward in one piece and curves into its armrest; each
+        armrest joins the rear post of the back frame. A seat cushion and a
+        reclined back cushion as two simple solid deep pine green shapes with no
+        tonal variation. Frame in solid dark smoked oak, far side solid warm mid
+        oak brown. Thick confident shapes, very few details. Isolated on ivory.
+  - name: r3-s1-pine
+    description: Round-2 monolithic profile with pine-green inner shell.
+    prompts:
+      - |
+        Pure side profile facing right of an armless sculptural lounge chair.
+        A thick monolithic smoked-oak outer shell rises as a tall gently curved
+        reclined back, then flows into a deep comfortable seat, carried by a solid
+        rear leg angled backward and a solid front leg angled slightly forward,
+        joined to the shell at clearly visible robust joints, both feet on the
+        same level. The inner face of the shell is a continuous deep pine green
+        upholstered layer, separated from the wood by one thin ivory reveal line.
+        A chair to sit upright in, not a lounger. Monolithic, poised, memorable.
+  - name: r3-s1-threequarter
+    description: Monolithic armless chair in three-quarter view with four legs.
+    prompts:
+      - |
+        Three-quarter view from the front right of an armless sculptural lounge
+        chair. One continuous thick bent smoked-oak shell forms a tall gently
+        curved reclined back flowing into a deep seat, visibly wide in this view.
+        Exactly four solid tapered legs, two front and two rear, all visible and
+        each meeting the underside of the shell at a clear joint. Outer surfaces
+        dark smoked oak, the top face of the seat and the front face of the back
+        in warm mid oak brown, separated by thin ivory reveals. Flat planes, no
+        shading. Monolithic, calm, gallery furniture. Isolated on ivory.
+capability_profiles:
+  - provider: Microsoft
+    model: MAI-Image-2.7
+    version: "2026-11-02"
+    capability:
+      adapter: mai
+      sizes: ["2048x2048"]
+      min_edge: 768
+      max_edge: 2048
+      min_pixels: 589824
+      max_pixels: 4194304
+      alignment: 1
+      max_aspect: 1
+      edit: true
+      max_references: 5
+      qualities: [standard]
+      native_edit_size: false
+      evidence: https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-mai-image
+      checked: "2026-11-22"
+      caveat: "Preview. Only documented 2048 square generation is enabled. The earlier explicitly approved 4K experiment was rejected; no native 4K is claimed."
+
+

@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,41 @@ class FoundationTests(unittest.TestCase):
                 with self.subTest(palette=palette["id"], foreground=foreground, background=background):
                     values = sorted((luminance(palette[foreground]), luminance(palette[background])))
                     self.assertGreaterEqual((values[1] + .05) / (values[0] + .05), 4.5)
+
+    def test_logo_review_marks_three_finalists_and_keeps_widgets_offline_and_readable(self):
+        builder = load("logo_review", "scripts/build_logo_review.py")
+        palette = next(p for p in json.loads((ROOT / "brand/furniture-palettes.json").read_text(encoding="utf-8"))
+                       if p["id"] == "C")
+        names = [name for _, entries in builder.ROUNDS for name, _ in entries]
+        self.assertEqual(len(names), 16)
+        self.assertEqual(len(set(names)), 16)
+        finalists = {name for name, *_ in builder.FINALISTS}
+        chosen = {name for _, entries in builder.ROUNDS for name, verdict in entries if verdict.startswith("Finalista")}
+        self.assertEqual(chosen, finalists)
+        gallery, deck = builder.build(palette, {n: f"brand-candidates/{n}.png" for n in names}, "brand-candidates/hero.png")
+        parsed = Document(deck)
+        self.assertEqual(len(parsed.ids), 6)
+        self.assertEqual(len(set(parsed.ids)), 6)
+        self.assertEqual(gallery.count('class="logo-card"'), 3)
+        self.assertEqual(gallery.count('<figure class="iteration'), 16)
+        self.assertEqual(gallery.count('<article class="widget '), 3)
+        widgets = gallery[gallery.index('id="widgets"'):gallery.index('id="iterations"')]
+        self.assertNotIn("http", widgets)
+        self.assertTrue(all(src.startswith("brand-candidates/") for src in
+                            (m["src"] for m in Document(widgets).media)))
+
+        def luminance(color):
+            channels = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            linear = [c / 12.92 if c <= .04045 else ((c + .055) / 1.055) ** 2.4 for c in channels]
+            return sum(c * weight for c, weight in zip(linear, (.2126, .7152, .0722)))
+
+        css = (ROOT / "docs/assets/logo-review.css").read_text(encoding="utf-8")
+        tokens = dict(re.findall(r"--(wood|deep|paper|muted|leaf|pine|oak):(#[0-9A-F]{6})", css))
+        for foreground, background in (("oak", "paper"), ("pine", "paper"), ("paper", "pine"),
+                                       ("leaf", "wood"), ("muted", "wood"), ("paper", "wood")):
+            with self.subTest(foreground=foreground, background=background):
+                values = sorted((luminance(tokens[foreground]), luminance(tokens[background])))
+                self.assertGreaterEqual((values[1] + .05) / (values[0] + .05), 4.5)
 
     def test_review_originals_are_verified_before_copying(self):
         from PIL import Image

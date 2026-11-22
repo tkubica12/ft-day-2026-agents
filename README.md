@@ -83,6 +83,16 @@ This preserves the approved atelier image and creates local
 independently. All candidates and their original bytes remain local and
 unapproved; `docs/presentation.html` is unchanged.
 
+Palette C was chosen. The logo round iterates the chair so its construction is
+plausible: either no armrest, or a three-quarter view where four legs carry the
+arms. Briefs `brand/logo-r1-brief.yaml` to `brand/logo-r3-brief.yaml` produced 16
+candidates; prepare each like the furniture brief, then run
+`python scripts\build_logo_review.py <r1.json> <r2.json> <r3.json> --atelier-manifest <original-run.json>`.
+It builds local `docs/logo-review.html` (three finalists at 128/64/32 px, A4,
+square and announcement Teams widget mockups, and all 16 iterations) and
+`docs/logo-slides.html`. Check it with `node tests\check_logo_browser.cjs`.
+Nothing is approved until the user selects a finalist.
+
 ## Runtime boundary
 
 The intended architecture remains Teams -> gateway -> Hermes -> Foundry, with

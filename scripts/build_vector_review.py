@@ -10,12 +10,17 @@ LOGO = "assets/javorna/chair.svg"
 REVERSE = "assets/javorna/chair-on-dark.svg"
 HERO = "assets/javorna/atelier.png"
 ORIGINAL = "assets/javorna/chair-original.png"
+CATEGORY_ICONS = {
+    "home": "assets/javorna/category-home.svg",
+    "workplace": "assets/javorna/category-workplace.svg",
+    "artistic": "assets/javorna/category-artistic.svg",
+}
 
 
 def inline_svg_images(markup):
     def embed(match):
         src = match[1]
-        if src not in (LOGO, REVERSE, "assets/javorna/growth-rings.svg"):
+        if src not in (LOGO, REVERSE, *CATEGORY_ICONS.values()):
             raise ValueError(f"Widgets accept only approved local SVG assets: {src}")
         encoded = base64.b64encode((ROOT / "docs" / src).read_bytes()).decode("ascii")
         return f'src="data:image/svg+xml;base64,{encoded}"'
@@ -31,16 +36,41 @@ def widgets():
             )]
 
 
+def commission_types():
+    categories = (
+        ("home", "Bydlení a domácnosti", "Nábytek a interiéry na míru."),
+        ("workplace", "Firmy a veřejné prostory", "Kanceláře, hotely a reprezentativní interiéry."),
+        ("artistic", "Umělecké a speciální zakázky", "Kostely, restaurace, film a restaurování."),
+    )
+    return (
+        '<section class="commission-widget" aria-labelledby="commission-heading">'
+        '<p class="commission-kicker">Nová zakázka · 01</p>'
+        '<h3 id="commission-heading">Pro jaký prostor tvoříme?</h3>'
+        '<p class="commission-intro">Vyberte typ zakázky. Podrobnosti doplníme v dalším kroku.</p>'
+        '<div class="commission-options" role="group" aria-label="Typ zakázky">'
+        + "".join(
+            '<div class="commission-option">'
+            f'<img src="{icon}" width="64" height="64" alt="">'
+            f'<strong>{title}</strong><span>{description}</span>'
+            '</div>'
+            for key, title, description in categories
+            for icon in (CATEGORY_ICONS[key],)
+        )
+        + '</div><p class="commission-caption">Formulářová navigace, ne další logo</p></section>'
+    )
+
+
 def widget_file(markup):
     css = (ROOT / "docs/assets/logo-review.css").read_text(encoding="utf-8")
     css += (ROOT / "docs/assets/javorna-brand.css").read_text(encoding="utf-8")
+    css += (ROOT / "docs/assets/vector-review.css").read_text(encoding="utf-8")
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
         'img-src data:; style-src \'unsafe-inline\'">'
         '<title>Javorna widget preview</title><style>'
-        + css + 'body{max-width:704px;box-sizing:border-box;margin:0 auto;padding:12px;background:#EEEBDD}.widget{max-width:680px;margin:auto}'
+        + css + 'body{max-width:704px;box-sizing:border-box;margin:0 auto;padding:12px;background:#EEEBDD}.widget{max-width:680px;margin:auto}.commission-widget{max-width:680px;margin:auto}'
         '</style></head><body>' + inline_svg_images(markup) + '</body></html>'
     )
 
@@ -77,7 +107,6 @@ def build():
             + '</div></section>'
         )
     logo_bytes = (ROOT / "docs" / LOGO).stat().st_size
-    motif_bytes = (ROOT / "docs/assets/javorna/growth-rings.svg").stat().st_size
     gallery += (
         '</div><p class="vector-facts">'
         f'SVG {logo_bytes:,} B · 5 barevných vrstev · žádná bitmapa · '
@@ -99,9 +128,8 @@ def build():
             markup = markup.replace('<h2 class="title-heading">', '<h1 class="title-heading">').replace('</h2>', '</h1>')
         deck += f'<section class="slide furniture-slide" id="s-{slug}">{markup}</section>'
     gallery += (
-        '<section class="review-direction" id="widgets"><h2>Widgety: vektor + data, bez fotografií.</h2>'
-        f'<p>Jeden dekorativní motiv letokruhů má {motif_bytes} B. '
-        'Čísla, tabulky a stav zůstávají čitelným HTML, ne součástí obrázku.</p><div class="widget-gallery">'
+        '<section class="review-direction" id="widgets"><h2>Widgety: logo, data a klid.</h2>'
+        '<p>Rozpočtová čísla a rozhodnutí potřebují přehledné záhlaví, ne dekoraci navíc.</p><div class="widget-gallery">'
     )
     sizes = {}
     for name, markup in widgets():
@@ -112,10 +140,18 @@ def build():
         (out / f"{name}.html").write_bytes(standalone.encode("utf-8"))
         gallery += (f'<figure class="widget-shot">{markup}<figcaption>{name} · '
                     f'{sizes[name]:,} B včetně CSS a vložených SVG</figcaption></figure>')
+    commission = widget_file(commission_types())
+    sizes["commission-types"] = len(commission.encode("utf-8"))
+    (ROOT / "docs/widgets/commission-types.html").write_bytes(commission.encode("utf-8"))
     gallery += (
-        '</div><p class="widget-limits">Samostatné offline náhledy. SVG jsou vložena jako data: obrázky; '
-        'ovládací prvky jsou jen vizuální makety. Nasazení a ověření v živých Teams teprve následuje.</p></section>'
-        '</main><footer class="doc-footer"><span>Javorna Group · fiktivní společnost · paleta C · '
+        '</div><p class="widget-limits">Samostatné offline náhledy. Rozpočtové widgety používají jen logo; '
+        'akce jsou vizuální makety. Nasazení v živých Teams teprve následuje.</p></section>'
+        '<section class="review-direction" id="commission-types"><h2>Zakázky: ikona vysvětluje volbu</h2>'
+        '<p>Jemné jednobarevné obrysy označují kategorii ve formuláři — nikdy nesoutěží s barevným křeslem Javorna.</p>'
+        f'<figure class="widget-shot">{commission_types()}'
+        '<figcaption>Výběr typu zakázky · malý SVG symbol + čitelný popisek</figcaption></figure>'
+        '<p class="widget-limits">Ikony jsou záměrně jiné než logo: tenký obrys, jedna barva, žádná židle ani trůn.</p>'
+        '</section></main><footer class="doc-footer"><span>Javorna Group · fiktivní společnost · paleta C · '
         'křeslo 3 · originál zachován</span></footer></div></body></html>'
     )
     (ROOT / ".local/vector-widget-sizes.json").write_text(json.dumps(sizes, indent=2), encoding="utf-8")

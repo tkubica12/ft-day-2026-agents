@@ -58,10 +58,15 @@ async function main() {
           assert.equal(mark.border, "0px");
         }
         await page.locator(".vector-pair").screenshot({path: path.join(shots, `lockups-${width}.png`)});
+        const categoryCount = await page.locator(".commission-option").count();
+        assert.equal(categoryCount, 3, "three business categories");
+        assert.equal(await page.locator(".commission-option img").evaluateAll(items =>
+          items.every(i => i.naturalWidth === 64 && i.naturalHeight === 64)), true);
         if (width === 1366) {
           await page.locator(".study-frame").nth(0).screenshot({path: path.join(shots, "title.png")});
           await page.locator(".study-frame").nth(1).screenshot({path: path.join(shots, "content.png")});
           await page.locator(".widget-gallery").screenshot({path: path.join(shots, "widgets.png")});
+          await page.locator("#commission-types").screenshot({path: path.join(shots, "commission-types.png")});
         }
         assert.deepEqual(errors, []);
       } finally { await context.close(); }
@@ -110,13 +115,15 @@ async function main() {
       await page.goto(pathToFileURL(path.join(root, "docs/vector-review.html")).href);
       assert.equal(await page.locator(".study-frame:visible").count(), 2);
       assert.equal(await page.locator(".widget:visible").count(), 3);
-      for (const name of ["decision", "status", "kickoff"]) {
+      assert.equal(await page.locator(".commission-option").count(), 3);
+      for (const name of ["decision", "status", "kickoff", "commission-types"]) {
         for (const width of [320, 680, 1920]) {
           await page.setViewportSize({width, height: 1100});
           await page.goto(pathToFileURL(path.join(root, `docs/widgets/${name}.html`)).href);
           await imageCheck(page);
           await widgetCheck(page);
           assert.equal(await page.evaluate(() => [...document.images].every(i => i.src.startsWith("data:image/svg+xml;base64,"))), true);
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${name} no horizontal overflow`);
         }
       }
     } finally { await context.close(); }

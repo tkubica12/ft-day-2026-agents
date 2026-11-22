@@ -91,14 +91,12 @@ def widget_square(image):
 def widget_announcement(image, hero):
     owners = (("Adam Vávra", "Decides exceptions"), ("Emma Hartmann", "Runs the process"),
               ("Otto", "Coordinates and follows up"))
-    visual = (f'<img class="photo" src="{esc(hero)}" width="2048" height="2048" alt="">'
-              if hero else '<img class="j-growth" src="assets/javorna/growth-rings.svg" width="240" height="240" alt="">')
+    visual = f'<img class="photo" src="{esc(hero)}" width="2048" height="2048" alt="">' if hero else ""
     return (
         '<article class="widget widget-announce"><div class="w-photo">'
         + (visual if hero else "")
         + '<div class="w-photo-copy"><div class="sq-top">' + mark(image)
         + '<span class="w-word">JAVORNA</span></div>'
-        + (visual if not hero else "")
         + '<h3 class="w-title">FY2027 budget season starts today.</h3></div></div>'
         '<div class="w-body"><ul class="w-owners">'
         + ''.join(f'<li><b>{esc(n)}</b><span>{esc(r)}</span></li>' for n, r in owners)

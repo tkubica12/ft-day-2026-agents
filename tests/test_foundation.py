@@ -74,6 +74,16 @@ class FoundationTests(unittest.TestCase):
                 self.assertTrue(all(m["src"].startswith("data:image/svg+xml;base64,") for m in media))
                 self.assertNotIn("<script", document)
                 self.assertIn("img-src data:", document)
+                self.assertNotIn("growth-rings", document)
+                if name in {"decision", "status", "kickoff"}:
+                    self.assertIn("chair-on-dark.svg", markup)
+        commission = builder.widget_file(builder.commission_types())
+        self.assertLess(len(commission.encode("utf-8")), 48_000)
+        self.assertEqual(commission.count('class="commission-option"'), 3)
+        self.assertEqual(commission.count("data:image/svg+xml;base64,"), 3)
+        self.assertIn("Bydlení a domácnosti", commission)
+        self.assertIn("Firmy a veřejné prostory", commission)
+        self.assertIn("Umělecké a speciální zakázky", commission)
         with self.assertRaisesRegex(ValueError, "only approved local SVG"):
             builder.inline_svg_images('<img src="assets/javorna/atelier.png">')
 

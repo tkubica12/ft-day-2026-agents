@@ -114,12 +114,21 @@ node tests\check_vector_browser.cjs
 ```
 
 This creates `docs/vector-review.html`, `docs/vector-slides.html` and three
-self-contained offline widget previews under `docs/widgets/`. The widgets
+self-contained offline budget-widget previews plus one commission-type
+selection mockup under `docs/widgets/`. The budget widgets
 contain only SVG data images, readable HTML data, CSS and visual action
-placeholders: no photos, scripts or live actions. The small growth-ring motif
-demonstrates the recommended decorative vocabulary. All three previews are
-below 24 KB including base64-encoded SVG and CSS; live gateway/Teams delivery
-is not implemented or verified by this design work.
+placeholders: no photos, scripts or live actions. The growth-ring motif has
+been removed from the budget widget headers. The three category icons
+(home, workplace and carving tool) appear only where the form asks what type
+of commission this is; they use a restrained single-colour outline, unlike the
+multicolour Javorna chair mark. All previews are offline and contain no scripts
+or live actions; live gateway/Teams delivery is not implemented or verified
+by this design work. The budget widgets include the compact logo but no
+additional header art; their complete offline HTML files are about 25–26 KB.
+The commission-type form mockup is a separate fourth example, with three
+64px line icons (home, workplace desk, carving tool) at about 17 KB total.
+Those illustrations appear only beside their explanatory category labels, not
+in budget summaries.
 
 Optional trace reproduction (requires existing Pillow, NumPy and OpenCV):
 `python scripts\vectorize_chair.py docs\assets\javorna\chair-original.png`.

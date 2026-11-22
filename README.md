@@ -13,6 +13,7 @@ amounts, projects and process events in this repository are synthetic.
 
 - `scenario/demo.json`: cast, synthetic scenario, prompts and recording outcomes.
 - `docs/presentation.html`: slide-first presentation skeleton, with recording slots.
+- `docs/player.html`: recorded-demo player (Penta player structure, Javorna design); each scene slot shows "Recording pending" until `docs/video/NN.mp4` exists.
 - `docs/demo-guide.html`: concise operator guide; prompts and expected results.
 - `video-production/`: EDL-based FFmpeg cutter; raw recordings remain immutable.
 - `.github/skills/`: portable HTML/image authoring skills and local recording/playbook skills.
@@ -43,17 +44,22 @@ has its own dependency manifest and lockfile; do not copy environments or secret
 
 ```powershell
 python scripts\build_docs.py
+python scripts\build_player.py
 python -m unittest discover -s tests -v
 New-Item -ItemType Directory -Force dist | Out-Null
 node docs\assets\bundle.js docs\presentation.html dist\presentation.html
 node docs\assets\bundle.js docs\demo-guide.html dist\demo-guide.html
 python video-production\build_clips.py --check
+python video-production\build_single_player.py         # e-mail copy, clips CRF 28, max 1920 px
+python video-production\build_single_player.py --full  # presentation copy, clips unchanged
+node tests\check_player_browser.cjs docs\player.html dist\Javorna-demo-player-single-file.html
 ```
 
-Edit the JSON scenario and rebuild the two HTML documents. Read the recording
+Edit the JSON scenario and rebuild the HTML documents and player. Read the recording
 skill before capturing new footage. Add verified trim ranges to
 `video-production/edl.json`, then run the cutter with the clip IDs to build.
-Presentation playback integration follows after new recordings exist; an empty
+The cutter writes `docs/video/NN.mp4`, which the player picks up by scene ID;
+then rebuild both single-file copies in `dist/`. An empty
 EDL intentionally refuses a render rather than reporting a successful empty build.
 
 ## Brand review

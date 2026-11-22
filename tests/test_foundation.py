@@ -217,6 +217,43 @@ class FoundationTests(unittest.TestCase):
             self.assertNotIn("brand-candidates/", text)
             self.assertIn("Not recorded yet" if text == deck else "pending", text)
 
+    def test_player_keeps_penta_runtime_with_branded_pending_slots(self):
+        player = load("player", "scripts/build_player.py")
+        builder = load("builder", "scripts/build_docs.py")
+        data = json.loads((ROOT / "scenario/demo.json").read_text(encoding="utf-8"))
+        page = player.build(data)
+        slots = re.findall(r'data-video="video/([0-9]{2})\.mp4"', page)
+        self.assertEqual(slots, [s["id"] for s in data["scenes"]])
+        self.assertEqual(page.count('class="pending"'), len(data["scenes"]))
+        self.assertEqual(page.count("    v.src = src;"), 1)
+        self.assertEqual(page.count("<script>"), 1)
+        self.assertEqual(page.count('<section class="slide'), 32)
+        for scene in data["scenes"]:
+            if scene["prompt"]:
+                self.assertIn(builder.esc(scene["prompt"]), page)
+        for presenter in data["presenters"]:
+            self.assertIn(f'<b>{builder.esc(presenter["name"])}</b>', page)
+        parsed = Document(page)
+        self.assertEqual(len(parsed.ids), len(set(parsed.ids)))
+        self.assertTrue(all(m["src"].startswith("assets/") for m in parsed.media if "src" in m))
+        for old in ("Ladislav", "Lála", "Penta", "Romania", "Tomas ", "Medivia", "BudgetingSeason"):
+            self.assertNotIn(old, page)
+
+    def test_single_file_embeds_assets_and_only_existing_clips(self):
+        packager = load("packager", "video-production/build_single_player.py")
+        page = (ROOT / "docs/player.html").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            clip = Path(tmp) / "03.mp4"
+            clip.write_bytes(b"not decoded in this test")
+            single = packager.package(page, [clip], full=True)
+        self.assertEqual(re.findall(r'<script type="application/octet-stream" data-clip="([^"]+)"', single),
+                         ["video/03.mp4"])
+        self.assertNotIn('"assets/', single)
+        self.assertIn("window.__clip(src)", single)
+        self.assertNotIn("    v.src = src;", single)
+        with self.assertRaises(SystemExit):
+            packager.package(page.replace("    v.src = src;", ""), [], full=True)
+
     def test_edl_rejects_unsafe_or_misleading_segments(self):
         cutter = load("cutter", "video-production/build_clips.py")
         valid = {"clips": [{"id": "01", "segments": [{"src": "01", "from": 0, "to": 1}]}]}

@@ -2,7 +2,10 @@
   "company": "Javorna Group",
   "event": "Frontier Day 2026",
   "event_date": "2026-11-26",
-  "presenter": "Tomáš Kubica, Microsoft",
+  "presenters": [
+    {"name": "Tomáš Kubica", "organisation": "Microsoft"},
+    {"name": "Viktor Kunst", "organisation": "Microsoft"}
+  ],
   "business": "Bespoke luxury furniture, architectural joinery and artistic woodwork for homes, representative spaces, offices, churches, heritage restoration and film commissions.",
   "countries": ["Czechia", "Slovakia", "Poland", "Hungary"],
   "cast": [

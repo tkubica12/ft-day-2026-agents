@@ -14,6 +14,13 @@ def esc(value):
     return html.escape(str(value), quote=True)
 
 
+def presenter_line(presenters):
+    organisations = list(dict.fromkeys(p["organisation"] for p in presenters))
+    if len(organisations) == 1:
+        return " · ".join([p["name"] for p in presenters] + organisations)
+    return " · ".join(f'{p["name"]}, {p["organisation"]}' for p in presenters)
+
+
 def head(template, title, doc_id):
     text = (SKILL / template).read_text(encoding="utf-8").split("<body>", 1)[0]
     text = re.sub(r"<title>.*?</title>", f"<title>{esc(title)}</title>", text)
@@ -64,7 +71,7 @@ def build(data):
     deck += '<main class="deck-stage javorna">\n'
     title = study(palette, {"chair": "assets/javorna/chair-on-dark.svg"},
                   "assets/javorna/atelier.png", approved=True)
-    title = title.replace("Tomáš Kubica · Microsoft", esc(data["presenter"]))
+    title = title.replace("Tomáš Kubica · Microsoft", esc(presenter_line(data["presenters"])))
     title = title.replace('<h2 class="title-heading">', '<h1 class="title-heading">').replace('</h2>', '</h1>')
     deck += f'<section class="slide furniture-slide" id="s-title">{title}</section>\n'
     deck += slide("company", "Bespoke work needs shared planning",

@@ -15,6 +15,10 @@
   },
   "atelier": "docs/assets/javorna/atelier.png",
   "atelier_sha256": "ed2912c5014ea1d17cd940ecaa457eb3ecd9bf4aa474ddbd0148245bf0908ebd",
+  "atelier_title": {
+    "path": "docs/assets/javorna/atelier-title.jpg",
+    "method": "Player title derivative of atelier.png: 1500x2048 crop at x=384, Lanczos to 1100x1502, progressive JPEG q84."
+  },
   "adaptation": {
     "method": "Five flat material colours; fitted vector curves; transparent background and openings.",
     "on_dark": "Identical geometry with lighter oak and muted green for dark surfaces.",

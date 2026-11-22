@@ -1,0 +1,91 @@
+common_requirements: |
+  Original identity studies for Javorna Group, a fictional Czech bespoke luxury
+  woodworking company operating in Czechia, Slovakia, Poland and Hungary.
+  Its work includes furniture, architectural joinery, sculptural wood objects,
+  heritage conservation, churches and film commissions. No existing company
+  logos, recognizable people, watermark or fabricated awards. Restrained,
+  tactile, architectural, confident; not a rustic souvenir brand or an AI startup.
+  Render the complete composition with generous margins. Exact native 2048x2048.
+size: 2048x2048
+quality: standard
+instances_per_prompt: 1
+max_attempts: 1
+output_dir: ../.local/image-output
+azure: {}
+preferences:
+  detail: Fine wood grain and precise simple mark geometry.
+  realism: Photorealistic materials in the hero; flat graphic marks in identity studies.
+  freshness: User selected MAI-Image-2.7 2026-11-02; native 4K probe was rejected; 2048 square explicitly approved.
+  cost: User ceiling USD 500; initial batch only four images, no automatic retries.
+images:
+  - name: joinery-mark
+    description: Direction A - precision joinery, a minimal J monogram.
+    prompts:
+      - |
+        An immaculate flat graphic logo concept on a warm white background,
+        centered within a square artboard. A single large elegant monogram J
+        constructed from two interlocking dark charcoal shapes suggesting a
+        dovetail joint. Precise negative space, calm symmetry, architectural
+        craft, instantly legible silhouette, strong at small scale. A tiny
+        inset of natural walnut color may appear within the mark. No lettering,
+        no brand name, no captions, no mockup, no embossing, no surrounding objects.
+        The mark occupies the central 40 percent with ample blank space.
+  - name: growth-mark
+    description: Direction B - wood grain and continuity, a sculptural emblem.
+    prompts:
+      - |
+        A refined flat graphic logo concept on a warm white square artboard.
+        Center one distinctive compact emblem made of three nested organic
+        charcoal lines, suggesting end-grain growth rings and a softly sculpted
+        initial J without literal lettering. Bespoke European atelier character,
+        confident thick enough strokes for a small app icon, restrained and
+        minimal, not a tree, leaf, fingerprint, forestry seal or recycling mark.
+        No text, no captions, no badges, no mockup, no surrounding objects.
+        The emblem occupies the central 40 percent with generous negative space.
+  - name: chisel-mark
+    description: Direction C - artistic woodworking, a faceted abstract form.
+    prompts:
+      - |
+        A flat graphic logo concept centered on a warm white square artboard.
+        One abstract sculptural emblem from three elegant faceted charcoal planes,
+        inspired by a wood sculptor's chisel revealing a form from a block.
+        Combine the precision of architectural joinery with the expressiveness
+        of fine art. Restrained simple contour, distinctive negative space,
+        quiet luxury, not a saw blade, hammer, house icon or generic cube logo.
+        No text, lettering, captions, mockup or surrounding objects.
+        The mark occupies the central 40 percent with ample blank space.
+  - name: workshop-hero
+    description: A title-slide hero bridging hand craft and precision production.
+    prompts:
+      - |
+        Photorealistic editorial architectural photograph of a fictional high-end
+        Central European woodworking atelier, balanced square composition. On the right
+        a beautifully finished sculptural walnut chair beside a long oak workbench;
+        fine dovetail details, a small carved architectural panel and carefully
+        arranged hand tools; a clean CNC machining area visible softly in depth.
+        No people. Soft north-facing daylight and believable warm wood grain,
+        matte surfaces, calm museum-quality craftsmanship, no orange color cast.
+        Reserve the left 35 percent as a softly lit quiet plaster wall,
+        uncluttered and suitable for later HTML title text. Eye-level camera,
+        natural perspective, not an impossible render or collage. No text, logos,
+        screens, labels, identifiable buildings, famous furniture designs or watermark.
+capability_profiles:
+  - provider: Microsoft
+    model: MAI-Image-2.7
+    version: "2026-11-02"
+    capability:
+      adapter: mai
+      sizes: ["2048x2048"]
+      min_edge: 768
+      max_edge: 2048
+      min_pixels: 589824
+      max_pixels: 4194304
+      alignment: 1
+      max_aspect: 1
+      edit: true
+      max_references: 5
+      qualities: [standard]
+      native_edit_size: false
+      evidence: https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-mai-image
+      checked: "2026-11-22"
+      caveat: "Preview. This profile intentionally enables only the documented 2048 square generation example. A user-authorized 4K probe was rejected with maximum pixel count 4194304. No 4K support or size-controlled editing is claimed."

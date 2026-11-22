@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en" data-default-accent="green">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otto at Javorna — Frontier Day 2026</title>
+<meta name="description" content="ONE SENTENCE SUMMARY">
+<meta name="doc-id" content="ft2026-deck">
+
+<!-- 1. Theme bootstrap. Must be the first script in <head>. -->
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"],
+    "print-theme": ["light", "dark"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "print-theme" ? "PDF theme: " + (current === "dark" ? "Dark" : "Light") :
+          name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "print-theme" ? "PDF theme: " + current + ". Switch to " + next :
+          name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name),
+      root.getAttribute(name === "print-theme" ? "data-print-theme" : "data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"], [data-action="toggle-print-theme"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+
+<!-- 2. Canonical design tokens. Copied verbatim from assets/tokens.css.
+     Never edit these values in a page. -->
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen theme and print theme are independent; print stays light by default. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+@media print {
+  :root[data-print-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+
+<!-- 3. Shared assets. Adjust the relative path to the assets folder. -->
+<link rel="stylesheet" href="assets/deck.css">
+<script src="assets/deck.js" defer></script>
+</head>
+
+<body>
+<main class="deck-stage">
+<section class="slide slide--title" id="s-title"><p class="slide-meta">FRONTIER DAY 2026 · JAVORNA GROUP</p><h1>Craft takes people.<br>Coordination takes Otto.</h1><p class="slide-sub">One budget season. Four countries. A digital colleague with clear boundaries.</p><p class="slide-meta">Tomáš Kubica, Microsoft</p><p class="slide-note">Fictional company and data · recording skeleton</p></section>
+<section class="slide" id="s-company"><div class="slide-head"><h2 class="slide-title">Bespoke work needs shared planning</h2></div><div class="slide-body"><p>Luxury furniture. Architectural joinery. Artistic woodwork.</p><p>Homes, offices and representative spaces; church, restoration and film commissions.</p><p>Czechia · Slovakia · Poland · Hungary</p></div><p class="slide-note">Javorna Group · fictional scenario</p></section>
+<section class="slide" id="s-cast"><div class="slide-head"><h2 class="slide-title">Four roles, different decision rights</h2></div><div class="slide-body"><table><thead><tr><th>Person</th><th>Responsibility</th></tr></thead><tbody><tr><td>Adam Vávra</td><td>Group CFO</td></tr><tr><td>Piotr Nowak</td><td>Managing Director, Poland</td></tr><tr><td>Emma Hartmann</td><td>Group FP&amp;A Lead</td></tr><tr><td>Otto Autopilot</td><td>Digital budget-season coordinator</td></tr></tbody></table></div><p class="slide-note"></p></section>
+<section class="slide" id="s-scene-01"><div class="slide-head"><h2 class="slide-title">The CFO delegates the season, not a prompt</h2></div><div class="slide-body"><p class="slide-lead">One goal. Named responsibilities. Work begins.</p></div><p class="slide-note">Adam → Otto · private chat</p></section>
+<section class="slide" id="s-recording-01"><div class="slide-head"><h2 class="slide-title">Recording 01</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Send the goal; show the reply and the fully rendered card.</p></section>
+<section class="slide" id="s-scene-02"><div class="slide-head"><h2 class="slide-title">Otto involves the process owner</h2></div><div class="slide-body"><p class="slide-lead">The process owner receives the handoff.</p></div><p class="slide-note">Emma · private chat</p></section>
+<section class="slide" id="s-recording-02"><div class="slide-head"><h2 class="slide-title">Recording 02</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Switch to Emma and read Otto&#x27;s unsolicited handoff.</p></section>
+<section class="slide" id="s-scene-03"><div class="slide-head"><h2 class="slide-title">The CFO controls when the team is informed</h2></div><div class="slide-body"><p class="slide-lead">People decide the timing. Otto executes.</p></div><p class="slide-note">Adam → Otto · private chat</p></section>
+<section class="slide" id="s-recording-03"><div class="slide-head"><h2 class="slide-title">Recording 03</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show the instruction and verified delivery confirmation.</p></section>
+<section class="slide" id="s-scene-04"><div class="slide-head"><h2 class="slide-title">The team sees one shared process</h2></div><div class="slide-body"><p class="slide-lead">Shared milestones. No private country figures.</p></div><p class="slide-note">Piotr · Teams activity and channel</p></section>
+<section class="slide" id="s-recording-04"><div class="slide-head"><h2 class="slide-title">Recording 04</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Open Activity, the mention and the actual channel thread.</p></section>
+<section class="slide" id="s-scene-05"><div class="slide-head"><h2 class="slide-title">A public question receives a private brief</h2></div><div class="slide-body"><p class="slide-lead">Public coordination. Private country numbers.</p></div><p class="slide-note">Piotr → Otto · channel reply</p></section>
+<section class="slide" id="s-recording-05"><div class="slide-head"><h2 class="slide-title">Recording 05</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Select a real Otto mention; retain the eyes reaction, public reply and private delivery.</p></section>
+<section class="slide" id="s-scene-06"><div class="slide-head"><h2 class="slide-title">A confident claim does not grant authority</h2></div><div class="slide-body"><p class="slide-lead">Verify authority. Protect the other country&#x27;s data.</p></div><p class="slide-note">Piotr → Otto · private chat</p></section>
+<section class="slide" id="s-recording-06"><div class="slide-head"><h2 class="slide-title">Recording 06</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show the refusal, pending claim and escalation; never substitute a fabricated response.</p></section>
+<section class="slide" id="s-scene-07"><div class="slide-head"><h2 class="slide-title">The CFO makes a bounded decision</h2></div><div class="slide-body"><p class="slide-lead">One-off decision. Reusable procedure. Separate approvals.</p></div><p class="slide-note">Adam → Otto · private chat</p></section>
+<section class="slide" id="s-recording-07"><div class="slide-head"><h2 class="slide-title">Recording 07</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show the decision and learning proposal; approve only the correct procedural change and capture success.</p></section>
+<section class="slide" id="s-scene-08"><div class="slide-head"><h2 class="slide-title">The decision reaches the person doing the work</h2></div><div class="slide-body"><p class="slide-lead">Close the loop, not just the escalation.</p></div><p class="slide-note">Piotr · private chat</p></section>
+<section class="slide" id="s-recording-08"><div class="slide-head"><h2 class="slide-title">Recording 08</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show the delivered decision, not an earlier pending message.</p></section>
+<section class="slide slide--section" id="s-week-three"><h2>Two weeks later</h2><p class="slide-lead">The same goal. New work.</p><p class="slide-note">Explicit simulated time jump to week 3</p></section>
+<section class="slide" id="s-scene-09"><div class="slide-head"><h2 class="slide-title">A shared status does not expose private budgets</h2></div><div class="slide-body"><p class="slide-lead">Three submitted. Slovakia overdue. Validation next.</p></div><p class="slide-note">Emma → Otto · private chat</p></section>
+<section class="slide" id="s-recording-09"><div class="slide-head"><h2 class="slide-title">Recording 09</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">After an explicit simulated time jump, show the status card and its lack of private figures.</p></section>
+<section class="slide" id="s-scene-10"><div class="slide-head"><h2 class="slide-title">Emma chooses the next process improvement</h2></div><div class="slide-body"><p class="slide-lead">The process owner identifies the missing tool.</p></div><p class="slide-note">Emma → Otto · private chat</p></section>
+<section class="slide" id="s-recording-10"><div class="slide-head"><h2 class="slide-title">Recording 10</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show Emma&#x27;s proposal and Otto&#x27;s acknowledgement.</p></section>
+<section class="slide" id="s-scene-11"><div class="slide-head"><h2 class="slide-title">Otto builds a tool within a clear boundary</h2></div><div class="slide-body"><p class="slide-lead">A request becomes a running, access-restricted application.</p></div><p class="slide-note">Emma → Otto · private chat</p></section>
+<section class="slide" id="s-recording-11"><div class="slide-head"><h2 class="slide-title">Recording 11</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show the request, meaningful progress and running card. Stop before any typing-only tail.</p></section>
+<section class="slide" id="s-scene-12"><div class="slide-head"><h2 class="slide-title">Otto delivers the tool to the right people</h2></div><div class="slide-body"><p class="slide-lead">Otto sends the invitations, not Emma.</p></div><p class="slide-note">Emma → Otto · private chat</p></section>
+<section class="slide" id="s-recording-12"><div class="slide-head"><h2 class="slide-title">Recording 12</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Show Emma&#x27;s delegation and the delivery confirmation.</p></section>
+<section class="slide" id="s-scene-13"><div class="slide-head"><h2 class="slide-title">Piotr completes a real booking</h2></div><div class="slide-body"><p class="slide-lead">An invitation becomes a confirmed Poland booking.</p></div><p class="slide-note">Piotr · invitation → booking app</p></section>
+<section class="slide" id="s-recording-13"><div class="slide-head"><h2 class="slide-title">Recording 13</h2></div><div class="slide-body"><div class="callout note"><span class="callout-label">Not recorded yet</span><p>New Javorna footage will go here.</p></div></div><p class="slide-note">Record the confirmation and a reload showing the saved booking. Exclude login, autofill and other browsing.</p></section>
+<section class="slide" id="s-recap"><div class="slide-head"><h2 class="slide-title">A digital colleague works within authority</h2></div><div class="slide-body"><ul class="arrow-list"><li>A goal outlives a conversation.</li><li>Coordination crosses people, channels and weeks.</li><li>Decisions and learning retain human ownership.</li></ul></div><p class="slide-note"></p></section>
+<section class="slide slide--end" id="s-end"><p>Delegate the work.<br>Keep the authority.</p></section>
+</main></body></html>

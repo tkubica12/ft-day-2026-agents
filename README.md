@@ -146,10 +146,29 @@ The vector adaptation remains available for the user's visual sign-off.
 
 ## Runtime boundary
 
-The intended architecture remains Teams -> gateway -> Hermes -> Foundry, with
-budget tools and WebIQ through an MCP toolbox. This foundation does not deploy
-or port those services. Carry over reviewed implementation fixes separately,
-with explicit environment bindings and fresh state.
+The architecture is Teams -> gateway -> Hermes -> Foundry, with budget tools
+and WebIQ (`web`, `news`) through the `otto-cio-forum` MCP toolbox. The
+deployment lives in `otto_deployment/agent-demos/autopilots-on-azure` and reuses
+the existing Otto identity (Teams app, Agent 365, Foundry project) with fresh
+Javorna state. This checkout is now authoritative for Otto; do not deploy from
+the earlier customer checkout, which no longer runs live.
+
+Teams: team "Javorna Budget Season" (`8580f2f4-b296-4066-9adb-dc0269bb4fc4`),
+owner Adam, members Emma, Piotr and Otto. Users are provisioned by
+`scripts/javorna_users.py`; first sign-in forces a password change.
+
+Run from the deployment folder with the session Azure config:
+
+```powershell
+uv run --frozen python -m scripts.deploy_apps_runtime --state-name otto --workspace autopilot-otto --apply --auto-approve --capture --deploy-services
+uv run --frozen python -m scripts.budget_season_ops backup
+uv run --frozen python -m scripts.budget_season_ops reset --backup <fresh-backup-dir>
+uv run --frozen python -m scripts.budget_season_ops season reset --week 0
+uv run --frozen python -m scripts.penta_toolbox probe
+```
+
+Reset before every recording. Sandboxes sleep after 300 s idle; warm them with
+one turn first. Do not replay or delete gateway quarantine entries.
 
 Use a separate team/channel, role mapping, agent memory, learning proposals,
 decisions, jobs and application access list. Never reset or reuse another demo's

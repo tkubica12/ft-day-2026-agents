@@ -1,6 +1,6 @@
 ---
 name: visual-artifacts
-description: Prepare an offline html-docs report, presentation, or brief from fictional Medivia data.
+description: Prepare an offline html-docs report, presentation, or brief from fictional Javorna Group data.
 ---
 
 # Visual artifacts
@@ -22,10 +22,9 @@ Use factual, dated source descriptions and label synthetic data explicitly.
 Text is plain text only: never include markup, event handlers, or URLs.
 The builder validates these limits and escapes content.
 
-The html-docs runtime uses a green accent, system fonts and an unchanged
-Dr.Max Group logo sourced from https://www.drmax.eu/assets/img/logo.svg.
-This is fictional Medivia data, not Dr.Max financial data. The notice is
-included in each document. Call `m365-collaboration`'s
+The html-docs runtime uses system fonts and the approved vector Javorna Group
+chair mark. Javorna Group is a fictional bespoke furniture and woodwork maker;
+all data is fictional demo data. The notice is included in each document. Call `m365-collaboration`'s
 `prepare_visual_artifact` with the current turn's `operation_scope` from the
 gateway instructions and the JSON string as `content_json`. Include its exact
 returned marker in the final answer. The tool only stages content; the gateway

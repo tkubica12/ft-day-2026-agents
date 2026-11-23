@@ -61,7 +61,7 @@ class HtmlWidgetTests(WidgetEnvironment, unittest.TestCase):
         self.assertIn("connect-src &#x27;none&#x27;", payload["html"])
         self.assertEqual(payload["securityPolicy"]["connectDomains"], [])
         self.assertIn('<html lang="en">', payload["html"])
-        self.assertIn("Fictional Medivia demo data — not Dr.Max data", payload["html"])
+        self.assertIn("Fictional Javorna Group demo data", payload["html"])
         self.assertIn('src="data:image/svg+xml;base64,', payload["html"])
         self.assertNotIn("test-key", activity.text)
         self.assertLess(payload["html"].index("window.addEventListener('message'"),

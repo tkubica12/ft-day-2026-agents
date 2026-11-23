@@ -87,7 +87,7 @@ class OperatorJobTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.bus.send.call_count, 1)
 
     async def test_rehearsal_persona_is_allowlisted_gated_and_labelled_as_operator_asserted(self):
-        body = {**self.body, "rehearsalPersona": "ladislav"}
+        body = {**self.body, "rehearsalPersona": "adam"}
         with patch.dict("os.environ", {"WORKER_ASSIGNMENT_PROFILE": "budget-season"}):
             disabled = await self.client.post("/invoke", headers=self.headers, json=body)
         self.assertEqual(disabled.status_code, 403)
@@ -110,10 +110,10 @@ class OperatorJobTests(unittest.IsolatedAsyncioTestCase):
                 finally:
                     durable_transport.delivery_identity.reset(token)
         arguments = model.await_args.kwargs
-        self.assertEqual(arguments["user_id"], "c767e8ee-2ef8-446f-a293-cf69661c6d69")
-        self.assertEqual(arguments["auth_context"].invoking_user_name, "Ladislav Lála")
+        self.assertEqual(arguments["user_id"], "801b3c78-562e-4c8f-918f-9a90254c050a")
+        self.assertEqual(arguments["auth_context"].invoking_user_name, "Adam Vávra")
         self.assertIn("not a Teams sign-in", arguments["message"])
-        self.assertIn("Invoking human: Ladislav Lála (c767e8ee-2ef8-446f-a293-cf69661c6d69)", arguments["message"])
+        self.assertIn("Invoking human: Adam Vávra (801b3c78-562e-4c8f-918f-9a90254c050a)", arguments["message"])
         self.assertTrue(arguments["message"].endswith("Message text:\nhello"))
 
     async def test_direct_native_admission_is_stored_in_the_original_gateway_work_receipt(self):
@@ -372,3 +372,4 @@ class OperatorJobTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -58,11 +58,13 @@ the full explanation, then exactly one JSON request:
   nested frames, secrets, credentials or background effects. Do not ask for host
   permissions. Local SVG/charts, filtering, sorting, input validation, tabs and
   calculations are appropriate. State when numbers are illustrative.
-- Write all content in English. Use green (`#008a00`) as one UI accent with white
-  and neutral surfaces, system fonts and readable spacing. The gateway inserts
-  the unchanged authentic Dr.Max Group logo and explicit fictional Medivia
-  disclaimer. Do not duplicate the logo, load it remotely or imply official
-  Dr.Max financial data. Do not style, remove or replace gateway host elements.
+- Write all content in English. Use the Javorna Group palette: dark wood text
+  (`#332E27`), oak secondary text (`#6B5A45`), paper surfaces (`#EEEBDD` or
+  white), muted borders (`#CFCCB6`), pine green (`#4C6138`) as the one UI accent
+  and leaf green (`#BCCB7A`) only for highlights on dark wood. Use system fonts
+  and readable spacing. The gateway inserts the approved Javorna Group chair
+  mark and the fictional-data disclaimer. Do not duplicate or redraw the logo,
+  load it remotely, or present the data as a real company's. Do not style, remove or replace gateway host elements.
 - Use semantic headings, visible labels and keyboard-accessible buttons. Avoid
   fixed heights or viewport widths; the widget sizes to its content.
 - Do not use element IDs beginning with `autopilot-`; those belong to the gateway.

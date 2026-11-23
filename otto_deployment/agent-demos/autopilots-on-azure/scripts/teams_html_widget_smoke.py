@@ -29,7 +29,7 @@ def widget_activity(probe_id: str, *, interactive: bool = False) -> dict:
         "html": "<h2>Otto: HTML inside Teams</h2>"
                 "<p>Fixed test content. No model call, external resources or business actions.</p>"
                 f"<p>Probe: {probe_id}</p>{counter}",
-        "css": "h2{margin-top:0}button{padding:8px 16px;border:1px solid #008a00;background:white}",
+        "css": "h2{margin-top:0}button{padding:8px 16px;border:1px solid #4C6138;background:white}",
         "javascript": javascript,
         "actions": [],
     }, session_key="smoke", user_id="", conversation_id="", fallback=f"HTML widget technical test ({probe_id}).")

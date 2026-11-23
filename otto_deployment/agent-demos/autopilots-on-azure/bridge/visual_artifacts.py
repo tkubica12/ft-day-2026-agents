@@ -66,7 +66,7 @@ def render_html(spec: dict[str, Any]) -> bytes:
     title = html.escape(spec["title"])
     language = "en"
     read, slides, previous, following, fictional = (
-        "Read", "Slides", "Previous", "Next", "Fictional Medivia demo data — not Dr.Max data"
+        "Read", "Slides", "Previous", "Next", "Fictional Javorna Group demo data"
     )
     sections = "".join(
         f'<section class="page"><h2>{html.escape(s["heading"])}</h2>'
@@ -124,7 +124,7 @@ def consent_activity(spec: dict[str, Any], visible: str, *, user_id: str, conver
     return Activity(type="message", text=visible or "Accept to receive your HTML report.",
                     attachments=[Attachment(
                         content_type="application/vnd.microsoft.teams.card.file.consent",
-                        name="medivia-report.html",
+                        name="javorna-report.html",
                         content={"description": "Standalone HTML report; accept to save it to your OneDrive.",
                                  "sizeInBytes": len(content), "acceptContext": context, "declineContext": context},
                     )])
@@ -180,5 +180,5 @@ async def upload_consent_file(item: Pending, info: dict) -> Activity:
                 raise RuntimeError(f"File upload failed with HTTP {response.status}.")
     return Activity(type="message", text="Your HTML report is ready.", attachments=[Attachment(
         content_type="application/vnd.microsoft.teams.card.file.info", content_url=content_url,
-        name="medivia-report.html", content={"uniqueId": unique_id, "fileType": "html"},
+        name="javorna-report.html", content={"uniqueId": unique_id, "fileType": "html"},
     )])

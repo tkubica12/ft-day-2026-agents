@@ -32,7 +32,7 @@ REMOTE_ROOT = "/data/hermes/workspace/budget-season"
 # In-world assets per demo scene, relative to `content.agent_assets`. The budget-season assets are not built yet.
 SCENES: dict[str, tuple[str, ...]] = {}
 # Mirrors the gateway allowlist in bridge.assignments.REHEARSAL_PERSONAS; the gateway remains the authority.
-PERSONAS = ("ladislav", "emma", "tomas")
+PERSONAS = ("adam", "emma", "piotr")
 
 
 def require_window(config: dict[str, Any], now: datetime | None = None) -> None:

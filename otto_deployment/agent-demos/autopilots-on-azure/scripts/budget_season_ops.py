@@ -194,7 +194,7 @@ print(json.dumps({'references':[{'referenceKey':k,'boundary':v.get('boundary'),*
 """
 
 SEASON_CHECK_PROMPT = (
-    "Weekly budget season check for Ladislav Lála, Group CFO. Use the budget-season-fy2027 skill and act as Otto doing "
+    "Weekly budget season check for Adam Vávra, Group CFO. Use the budget-season-fy2027 skill and act as Otto doing "
     "your own coordination work: on_behalf_of is 'otto'. Call season_overview, then do what the weekly cadence row of "
     "the current season week asks. Send entity owners reminders or queries through send_entity_message only when they "
     "are due. In week 7, build the board pack draft from board_pack_data. Report to the Group CFO only what needs his "

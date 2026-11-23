@@ -1,9 +1,14 @@
 {
-  "logoSource": "https://www.drmax.eu/assets/img/logo.svg",
-  "logoSha256": "578894ecd9cd112b9b4667f97bab5896fb0df1bcc877ee66cfcf59fccd0dc37b",
-  "logoGreen": "#7BB929",
-  "logoRed": "#E4032D",
-  "logoGray": "#A8A8AA",
+  "company": "Javorna Group",
+  "logoSource": "ft-day-2026-agents/docs/assets/javorna/chair.svg",
+  "logoSha256": "40260e819c0d2cd634f1a763650a08ef6247bca5a23356d6532f8d5f09a93d97",
+  "wood": "#332E27",
+  "deep": "#211F1A",
+  "paper": "#EEEBDD",
+  "muted": "#CFCCB6",
+  "leaf": "#BCCB7A",
+  "pine": "#4C6138",
+  "oak": "#6B5A45",
   "background": "#FFFFFF",
-  "disclaimer": "Fictional Medivia demo data — not Dr.Max data"
+  "disclaimer": "Fictional Javorna Group demo data"
 }

@@ -37,7 +37,7 @@ class VisualArtifactTests(unittest.TestCase):
         self.assertIn("default-src 'none'", content)
         self.assertIn("Slides", content)
         self.assertIn('<html lang="en">', content)
-        self.assertIn("Fictional Medivia demo data — not Dr.Max data", content)
+        self.assertIn("Fictional Javorna Group demo data", content)
 
     def test_rejects_malformed_and_oversized_input(self):
         for value in ({"title": "a", "sections": []}, {"title": "a", "sections": SPEC["sections"] * 5}):

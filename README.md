@@ -29,7 +29,7 @@ an executed demo. Generated brand imagery is illustrative, not a customer photo.
 |---|---|---|
 | Adam Vávra | Group CFO; decisions and learning approval | adam.vavra@tomasonline.net |
 | Piotr Nowak | Managing Director, Poland | piotr.nowak@tomasonline.net |
-| Emma Hartmann | Group FP&A Lead; process and calendar | emma.hartmann@tomasonline.net |
+| Emma Hartmann | Group FP&A Lead; process and calendar | emma@tomasonline.net |
 | Otto Autopilot | Digital budget-season coordinator | Existing bot identity, binding pending |
 
 UPNs are the desired demo mapping, not a claim that users exist. Verify Emma's

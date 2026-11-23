@@ -383,6 +383,14 @@ class Season:
                     f"EUR {amount} M of click-and-collect revenue here is correctly booked, but {names} also reports it. "
                     "The correction belongs to the store submission.",
                     related=list(overlaps) if group else [], amount=amount, guideline="Click-and-collect")
+        capex_cap = seed.GUIDELINES.get("country_capex_cap_eur_m", {}).get(entity)
+        if capex_cap is not None:
+            capex_total = money(sum(seed.CAPEX_PIPELINE[p]["amount_eur_m"] for p in lines.get("capex_projects", [])
+                                    if p in seed.CAPEX_PIPELINE))
+            if capex_total > capex_cap + 1e-9:
+                add("CAPEXCAP", "high", "Country capex above cap",
+                    f"Submitted capex EUR {capex_total} M vs the country cap EUR {capex_cap} M. Only the Group CFO can change a cap.",
+                    amount=money(capex_total - capex_cap), guideline="Capex caps")
         cap = seed.GUIDELINES["marketing_cap_pct_of_revenue"][info["kind"]]
         ratio = round(lines["marketing_eur_m"] / lines["revenue_eur_m"] * 100, 2)
         if ratio > cap:
@@ -469,8 +477,9 @@ class Season:
                            "marketingCapPct": seed.GUIDELINES["marketing_cap_pct_of_revenue"][seed.ENTITIES[entity]["kind"]],
                            "rentIndexationPct": seed.GUIDELINES["rent_indexation_pct"],
                            "costCap": seed.GUIDELINES["cost_cap_rule"],
-                           "clickAndCollect": seed.GUIDELINES["click_and_collect_rule"],
-                           "newStores": seed.GUIDELINES["new_store_rule"]},
+                           "crossBorderCommissions": seed.GUIDELINES["click_and_collect_rule"],
+                           "capacityCapex": seed.GUIDELINES["new_store_rule"],
+                           "countryCapexCapEurM": seed.GUIDELINES.get("country_capex_cap_eur_m", {}).get(entity)},
             "capexPipeline": {pid: item for pid, item in seed.CAPEX_PIPELINE.items() if item["entity"] == entity},
             "latestSubmission": ({"version": latest["version"], "week": latest["week"], "revenueEurM": latest["lines"]["revenue_eur_m"],
                                   **compute(latest["lines"])} if latest else None),

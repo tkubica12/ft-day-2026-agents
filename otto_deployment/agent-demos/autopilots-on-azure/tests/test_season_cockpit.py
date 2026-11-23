@@ -17,7 +17,7 @@ def snapshot(week=3, claim="plain claim"):
     return {
         "observedUtc": "2026-11-12T22:00:00+00:00",
         "export": {
-            "group": "Medivia Pharmacy Group", "fiscalYear": "FY2027",
+            "group": "Javorna Group", "fiscalYear": "FY2027",
             "state": {
                 "week": week, "outbox": [{"entity": "SK", "kind": "brief", "to": "Zuzana", "toTitle": "MD"}],
                 "submissions": submissions, "decisions": [], "exceptions": [],

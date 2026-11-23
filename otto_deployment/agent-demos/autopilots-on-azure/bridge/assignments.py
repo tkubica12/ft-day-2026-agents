@@ -12,8 +12,8 @@ import os
 BUDGET_SEASON_PLAYBOOK = "budget-season-fy2027"
 
 BUDGET_SEASON_BRIEF = f"""Assignment: you are Otto, the digital junior of Group FP&A, coordinating the 8-week FY2027 budget season of the
-pharmacy group from kickoff to the board. The Group CFO is your manager, owns your working procedure and approves its
-changes. The Group FP&A Lead runs the process day to day. Country and brand managing directors own entity budgets.
+Javorna Group (fictional bespoke furniture and woodwork maker) from kickoff to the board. The Group CFO is your manager, owns your working procedure and approves its
+changes. The Group FP&A Lead runs the process day to day. Country managing directors own their country budgets.
 
 Demo language: English. Write every demo-facing reply, reminder, report, presentation, brief, widget and generated
 application in English, even when the incoming request or source is in another language. Preserve proper names,
@@ -51,9 +51,9 @@ BRIEFS = {"budget-season": BUDGET_SEASON_BRIEF}
 # Operator rehearsals may speak as these real demo accounts only; simulated entity owners never chat with Otto.
 REHEARSAL_PERSONAS = {
     "budget-season": {
-        "ladislav": ("Ladislav Lála", "c767e8ee-2ef8-446f-a293-cf69661c6d69"),
+        "adam": ("Adam Vávra", "801b3c78-562e-4c8f-918f-9a90254c050a"),
         "emma": ("Emma Hartmann", "154edb23-6208-4a14-ba1f-761c7445be4d"),
-        "tomas": ("Tomas", "e011e2a1-33d6-418f-b2ed-35f7d2281f45"),
+        "piotr": ("Piotr Nowak", "aa1b8d42-b671-4d6d-a438-a0a94c4f68dd"),
     },
 }
 

@@ -98,12 +98,12 @@ def article_body(spec: dict) -> str:
 <div class="doc">
   <header class="doc-header" id="opening">
     <div class="slide-content slide-content--title">
-      <img class="brand-logo" src="assets/drmax-group-logo.svg" alt="Dr.Max Group">
+      <img class="brand-logo" src="assets/javorna-group-logo.svg" alt="Javorna Group">
       <p class="slide-eyebrow">{esc(BRAND["disclaimer"])}</p>
       <h2 class="slide-title">{esc(spec["title"])}</h2>
       <p class="slide-lead">{esc(spec["subtitle"])}</p>
     </div>
-    <img class="brand-logo" src="assets/drmax-group-logo.svg" alt="Dr.Max Group">
+    <img class="brand-logo" src="assets/javorna-group-logo.svg" alt="Javorna Group">
     <p class="brand-disclaimer">{esc(BRAND["disclaimer"])}</p>
     <h1>{esc(spec["title"])}</h1><p class="subtitle">{esc(spec["subtitle"])}</p>
   </header>
@@ -132,7 +132,7 @@ def sheet_body(spec: dict) -> str:
   <button type="button" class="ctrl" data-action="toggle-accent">Accent: Green</button>
 </div>
 <section class="sheet" aria-label="{esc(spec["title"])}"><article class="sheet-page" id="page-summary">
-  <header class="sheet-head"><img class="brand-logo" src="assets/drmax-group-logo.svg" alt="Dr.Max Group">
+  <header class="sheet-head"><img class="brand-logo" src="assets/javorna-group-logo.svg" alt="Javorna Group">
     <p class="brand-disclaimer">{esc(BRAND["disclaimer"])}</p>
     <h1 class="sheet-title">{esc(spec["title"])}</h1><p class="sheet-lead">{esc(spec["subtitle"])}</p>
   </header>
@@ -144,9 +144,9 @@ def sheet_body(spec: dict) -> str:
 
 def source_document(spec: dict) -> str:
     spec = validate(spec)
-    logo = ROOT / "assets" / "drmax-group-logo.svg"
+    logo = ROOT / "assets" / "javorna-group-logo.svg"
     if hashlib.sha256(logo.read_bytes()).hexdigest() != BRAND["logoSha256"]:
-        raise ValueError("The supplied Dr.Max Group logo does not match its verified hash")
+        raise ValueError("The approved Javorna Group logo does not match its verified hash")
     sheet = spec["kind"] == "brief"
     template = (ROOT / ("sheet.template.html" if sheet else "article.template.html")).read_text(encoding="utf-8")
     template = template.replace('data-default-accent="blue"', 'data-default-accent="green"')
@@ -155,9 +155,9 @@ def source_document(spec: dict) -> str:
     template = template.replace('content="SLUG"', f'content="otto-{hashlib.sha256(json.dumps(spec, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:16]}"', 1)
     style = """
 <style>
-.brand-logo { display:block; width:160px; max-width:40%; height:auto; margin:0 0 16px; }
+.brand-logo { display:block; width:64px; max-width:40%; height:auto; margin:0 0 16px; }
 .brand-disclaimer { font:600 12px/1.35 system-ui,"DejaVu Sans",sans-serif; color:var(--text-muted); }
-[data-view="slides"] .slide-content .brand-logo { width:160px; height:auto; }
+[data-view="slides"] .slide-content .brand-logo { width:72px; height:auto; }
 [data-view="slides"] .slide-content .slide-eyebrow { font-size:clamp(11px,1vw,15px); letter-spacing:normal; text-transform:none; }
 </style>"""
     template = template.replace("</head>", style + "\n</head>", 1)
@@ -192,8 +192,8 @@ def expected_document(spec: dict) -> bytes:
 
     document = re.sub(r'<link rel="stylesheet" href="assets/([^"]+)">', css, document)
     document = re.sub(r'<script src="assets/([^"]+)" defer></script>', script, document)
-    logo = base64.b64encode((ROOT / "assets" / "drmax-group-logo.svg").read_bytes()).decode("ascii")
-    document = document.replace('src="assets/drmax-group-logo.svg"', 'src="data:image/svg+xml;base64,' + logo + '"')
+    logo = base64.b64encode((ROOT / "assets" / "javorna-group-logo.svg").read_bytes()).decode("ascii")
+    document = document.replace('src="assets/javorna-group-logo.svg"', 'src="data:image/svg+xml;base64,' + logo + '"')
     return document.encode("utf-8")
 
 

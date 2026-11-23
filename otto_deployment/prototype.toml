@@ -1,9 +1,9 @@
 [prototype]
-name = "Otto Autopilot"
+name = "Otto Autopilot (Javorna Group, Frontier Day 2026)"
 worker = "otto"
 source_repository = "https://github.com/tkubica12/agent-demos"
 source_project = "autopilots-on-azure"
-deadline_utc = "2026-11-15T20:00:00Z"
+deadline_utc = "2026-11-27T20:00:00Z"
 language = "en"
 
 [azure]
@@ -22,15 +22,14 @@ maximum_live_test_turns = 100
 maximum_test_duration_seconds = 1800
 allow_license_purchases = false
 allow_shared_platform_apply = false
-allow_existing_worker_changes = false
+allow_existing_worker_changes = true
 
 [personas]
-tomas = "tomas@tomasonline.net"
-tomas_object_id = "e011e2a1-33d6-418f-b2ed-35f7d2281f45"
-ladislav = "ladislav@tomasonline.net"
+adam = "adam.vavra@tomasonline.net"
+piotr = "piotr.nowak@tomasonline.net"
 emma = "emma@tomasonline.net"
 otto = "otto@tomasonline.net"
 
 [content]
 agent_assets = "../otto_assets"
-excluded_from_agent = ["demo-budget-season.md", "message-for-ladislav.cs.md"]
+excluded_from_agent = []

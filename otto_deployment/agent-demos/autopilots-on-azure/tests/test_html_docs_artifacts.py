@@ -37,7 +37,7 @@ class HtmlDocsArtifactTests(unittest.TestCase):
                 target = Path(directory) / "output.html"
                 builder.build(spec(kind), target)
                 content = target.read_text(encoding="utf-8")
-                logo = base64.b64encode((SKILL / "assets" / "drmax-group-logo.svg").read_bytes()).decode()
+                logo = base64.b64encode((SKILL / "assets" / "javorna-group-logo.svg").read_bytes()).decode()
                 self.assertIn(logo, content)
                 self.assertIn(builder.BRAND["disclaimer"], content)
                 self.assertNotIn('src="assets/', content)
@@ -45,7 +45,7 @@ class HtmlDocsArtifactTests(unittest.TestCase):
                 self.assertIn("Permission is hereby granted", content)
                 self.assertIn('<html lang="en"', content)
                 self.assertIn('aria-label="Document controls"', content)
-                self.assertIn("Fictional Medivia demo data — not Dr.Max data", content)
+                self.assertIn("Fictional Javorna Group demo data", content)
                 self.assertIn('data-default-accent="green"', content)
                 self.assertIn('data-action="toggle-slides"' if kind != "brief" else "sheet-page", content)
                 if kind != "brief":

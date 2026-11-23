@@ -328,9 +328,9 @@ def bridge_instructions(request: AgentRequest) -> str:
         widgets = (
             "\n\nInline Teams HTML widgets are enabled in this personal chat. "
             + WIDGET_REPLY_POLICY
-            + " Write English HTML, CSS and JavaScript using green-neutral "
-            "pharmacy-inspired styling; the gateway supplies the authentic inline Dr.Max Group "
-            "logo and fictional Medivia disclaimer, host protocol and bounded selection callbacks. "
+            + " Write English HTML, CSS and JavaScript using the Javorna Group wood palette "
+            "(dark wood text, paper surfaces, pine green accent); the gateway supplies the inline "
+            "Javorna Group logo and fictional-data disclaimer, host protocol and bounded selection callbacks. "
             "No external resources, raw wire fences, capabilities or invoke payloads. Do not mix "
             "interactive markers. A selection is a normal request, never budget approval or "
             "authority for external effects; retain the existing governed authorization workflow. "

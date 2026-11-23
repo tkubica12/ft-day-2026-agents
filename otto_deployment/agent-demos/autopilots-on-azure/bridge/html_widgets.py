@@ -241,9 +241,9 @@ def render_widget(
         raise ValueError("A useful plain-text widget fallback is required.")
     brand_builder = builder()
     brand = brand_builder.BRAND
-    logo = (brand_builder.ROOT / "assets" / "drmax-group-logo.svg").read_bytes()
+    logo = (brand_builder.ROOT / "assets" / "javorna-group-logo.svg").read_bytes()
     if hashlib.sha256(logo).hexdigest() != brand["logoSha256"]:
-        raise ValueError("The supplied Dr.Max Group logo does not match its verified hash")
+        raise ValueError("The approved Javorna Group logo does not match its verified hash")
     _prune_capabilities()
     if len(_issued_capabilities) + len(spec["actions"]) > MAX_CAPABILITIES:
         raise RuntimeError("Too many outstanding widget selections; try again after their expiry.")
@@ -266,13 +266,13 @@ def render_widget(
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         f'<meta http-equiv="Content-Security-Policy" content="{html.escape(POLICY, quote=True)}">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<style>body{margin:0;font:16px system-ui,"DejaVu Sans",sans-serif;color:#191919;background:white}'
-        '#autopilot-root{padding:20px;box-sizing:border-box;border-top:4px solid #008a00}'
-        '#autopilot-brand img{display:block;width:160px;height:auto;margin-bottom:12px}'
-        '#autopilot-brand p,#autopilot-status{font-size:12px;color:#555}'
+        '<style>body{margin:0;font:16px system-ui,"DejaVu Sans",sans-serif;color:#332E27;background:white}'
+        '#autopilot-root{padding:20px;box-sizing:border-box;border-top:4px solid #4C6138}'
+        '#autopilot-brand img{display:block;width:56px;height:auto;margin-bottom:10px}'
+        '#autopilot-brand p,#autopilot-status{font-size:12px;color:#6B5A45}'
         'button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:default}'
         f'{spec["css"]}</style></head><body><main id="autopilot-root">'
-        f'<header id="autopilot-brand"><img alt="Dr.Max Group" src="data:image/svg+xml;base64,{base64.b64encode(logo).decode()}">'
+        f'<header id="autopilot-brand"><img alt="Javorna Group" src="data:image/svg+xml;base64,{base64.b64encode(logo).decode()}">'
         f'<p>{html.escape(brand["disclaimer"])}</p></header>'
         f'{spec["html"]}<p id="autopilot-status" role="status">Connecting to Teams...</p>'
         f'</main><script>{script}</script></body></html>'

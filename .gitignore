@@ -28,3 +28,22 @@ brand/output/
 brand/*.local.*
 validation/
 dist/
+
+# Deployment state (see otto_deployment)
+.azure/
+azure-login/
+*.dpapi
+*.crt
+*.cer
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+tfplan
+*.tfplan
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.log

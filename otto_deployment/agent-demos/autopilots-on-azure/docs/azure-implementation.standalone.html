@@ -1,0 +1,2720 @@
+<!doctype html>
+<html lang="en" data-default-accent="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Azure implementation</title>
+<meta name="description" content="Which Azure resources, identities, and lifecycle rules run the Autopilots reference deployment.">
+<meta name="doc-id" content="autopilots-azure-implementation">
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name), root.getAttribute("data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen only: every PDF and printout uses the light palette. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+<style>
+/* =========================================================================
+   html-docs / article runtime
+   Shared stylesheet for dynamic articles. Never edit per page.
+
+   Requires canonical tokens inline in the head. Presentation is in slides.css.
+   ========================================================================= */
+
+/* ---------- base ---------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: 0 24px 96px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.62;
+  counter-reset: card;
+}
+
+.doc {
+  max-width: var(--canvas);
+  margin: 0 auto;
+}
+
+p { margin: 0 0 1em; }
+p:last-child { margin-bottom: 0; }
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+a:hover { color: var(--accent-strong); }
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+h1, h2, h3, h4 { line-height: 1.24; font-weight: 650; }
+
+hr { border: 0; border-top: 1px solid var(--border); margin: 40px 0; }
+
+ul, ol { margin: 0 0 1em; padding-left: 1.3em; }
+li { margin: 0.28em 0; }
+
+strong { font-weight: 650; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+:not(pre) > code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.08em 0.34em;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1em;
+  font-size: 0.96em;
+}
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+th {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ---------- controls bar -------------------------------------------- */
+
+.controls {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(8px);
+}
+
+.ctrl {
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.ctrl:hover { background: var(--surface-2); color: var(--text); }
+.ctrl[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+/* ---------- header, nav, toc ---------------------------------------- */
+
+.doc-header { padding: 84px 0 8px; }
+
+.eyebrow {
+  margin: 0 0 14px;
+  font-size: 0.74rem;
+  font-weight: 620;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.doc-header h1 {
+  margin: 0 0 14px;
+  font-size: clamp(2.1rem, 4.6vw, 3.1rem);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0 0 14px;
+  max-width: 74ch;
+  font-size: 1.14rem;
+  color: var(--text-muted);
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-faint);
+}
+
+.doc-nav, .doc-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 18px 0;
+  font-size: 0.9rem;
+}
+.doc-nav { border-bottom: 1px solid var(--border); margin-bottom: 44px; }
+.doc-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 64px;
+  color: var(--text-muted);
+}
+
+.toc {
+  margin: 0 0 48px;
+  padding: 20px 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.toc-label {
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.toc ol { margin: 0; padding-left: 1.2em; }
+.toc li { margin: 0.2em 0; }
+
+/* ---------- chapter -------------------------------------------------- */
+
+.chapter { margin: 0 0 56px; }
+
+.chapter-label {
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.76rem;
+  font-weight: 620;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---------- card ------------------------------------------------------ */
+
+.card {
+  margin: 0 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+}
+.card:last-child { margin-bottom: 0; }
+.card[data-open] { box-shadow: var(--shadow-2); }
+
+.card:not(.card--lead) { counter-increment: card; }
+
+.card-head { margin: 0; font-size: 1rem; }
+
+.card-toggle {
+  display: grid;
+  grid-template-columns: 46px 1fr 18px 24px;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  padding: 18px 20px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.card-toggle:hover { background: var(--surface-2); }
+
+.card-num {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  padding-top: 0.34em;
+}
+.card:not(.card--lead) .card-num:empty::before {
+  content: counter(card, decimal-leading-zero);
+}
+.card--lead .card-toggle { grid-template-columns: 46px 1fr 18px 24px; }
+
+/* Read marker. Space is reserved whether or not the card is marked, so
+   marking one never shifts the layout. Unread is invisible until the head is
+   hovered, which hints that the mark exists without decorating every row. */
+.card-read {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  margin-top: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.card-head:hover .card-read { opacity: 0.3; }
+.card[data-read="true"] .card-read,
+.card[data-read="true"] .card-head:hover .card-read {
+  opacity: 1;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Drawn rather than typed: a check glyph in this range reads as an emoji to
+   text extractors, and drawing it keeps the weight matched to the border. */
+.card[data-read="true"] .card-read::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(42deg);
+}
+
+.card-titles { display: block; min-width: 0; }
+
+.card-title {
+  display: block;
+  font-size: 1.22rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.card-sub {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.96rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.card-mark {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+.card-mark::before, .card-mark::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 1.5px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.card-mark::after { transform: translate(-50%, -50%) rotate(90deg); }
+.card[data-open] .card-mark { border-color: var(--accent-border); color: var(--accent); }
+.card[data-open] .card-mark::after { opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
+
+.card-body { padding: 0 20px 22px 78px; }
+
+.js .card-body { display: none; }
+.js .card[data-open] > .card-body { display: block; animation: doc-open 0.18s ease; }
+
+@keyframes doc-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.card-body > h4 {
+  margin: 26px 0 10px;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+}
+.card-body > h4:first-child { margin-top: 0; }
+
+/* ---------- reveal ---------------------------------------------------- */
+
+.reveal {
+  margin: 20px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.reveal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 0.98rem;
+  text-align: left;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.reveal-toggle::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+}
+.reveal[data-open] > .reveal-toggle::before { transform: rotate(45deg); }
+.reveal-toggle:hover { background: var(--surface-3); }
+
+.reveal-body {
+  padding: 2px 16px 16px 33px;
+  font-size: 1rem;
+}
+.js .reveal-body { display: none; }
+.js .reveal[data-open] > .reveal-body { display: block; animation: doc-open 0.18s ease; }
+
+/* ---------- tabs ------------------------------------------------------ */
+
+.tabs { margin: 22px 0; }
+
+.tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: -1px;
+}
+
+.tablist [role="tab"] {
+  font: inherit;
+  font-size: 0.92rem;
+  padding: 9px 15px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+}
+.tablist [role="tab"]:hover { color: var(--text); background: var(--surface-2); }
+.tablist [role="tab"][aria-selected="true"] {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  border-bottom-color: var(--accent-soft);
+  font-weight: 600;
+}
+
+.tabpanel {
+  padding: 18px 20px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+}
+
+html:not(.js) .tablist { display: none; }
+html:not(.js) .tabpanel[hidden] { display: block; }
+html:not(.js) .tabpanel { margin-bottom: 8px; border-radius: var(--radius-sm); }
+html:not(.js) .tabpanel[data-tab-label]::before {
+  content: attr(data-tab-label);
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.74rem;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+/* ---------- detail grid ---------------------------------------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.detail-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.detail-open {
+  display: block;
+  width: 100%;
+  padding: 16px 18px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.detail-open:hover { background: var(--surface-3); }
+
+.detail-title {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 620;
+  margin-bottom: 5px;
+}
+.detail-summary { display: block; color: var(--text-muted); font-size: 0.98rem; }
+.detail-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.detail-more::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid currentColor;
+  border-top: 1.6px solid currentColor;
+  transform: rotate(45deg);
+}
+html:not(.js) .detail-more { display: none; }
+
+.detail-body { padding: 0 18px 16px; }
+.js .detail-body { display: none; }
+
+/* ---------- dialog ---------------------------------------------------- */
+
+.doc-dialog {
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+}
+.doc-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+
+.doc-dialog-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 12px;
+}
+.doc-dialog-head h2 { margin: 0; font-size: 1.2rem; }
+
+.doc-dialog-body {
+  padding: 0 22px 24px;
+  overflow: auto;
+  max-height: calc(100vh - 190px);
+}
+.js .doc-dialog-body .detail-body { display: block; padding: 0; }
+
+.doc-dialog-close {
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.doc-dialog-close:hover { color: var(--text); background: var(--surface-2); }
+
+/* ---------- sequence -------------------------------------------------- */
+
+.sequence {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: seq;
+}
+.sequence > li {
+  position: relative;
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-quiet);
+  border-radius: var(--radius-sm);
+}
+.sequence > li:last-child { border-left-color: var(--accent-strong); background: var(--accent-soft); }
+.sequence > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -9px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--border-strong);
+  border-top: 1.6px solid var(--border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+.seq-title {
+  display: block;
+  font-weight: 620;
+  font-size: 0.98rem;
+  margin-bottom: 4px;
+}
+.seq-note { display: block; font-size: 0.9rem; color: var(--text-muted); }
+
+/* ---------- steps ------------------------------------------------------ */
+
+.steps {
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.steps > li {
+  position: relative;
+  counter-increment: step;
+  margin: 0 0 14px;
+  padding-left: 46px;
+}
+.steps > li:last-child { margin-bottom: 0; }
+.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 50%;
+}
+.steps h3, .steps h4 { margin: 4px 0 4px; font-size: 1.02rem; }
+
+/* ---------- summary grid ---------------------------------------------- */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+.summary-item {
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.summary-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ---------- arrow list -------------------------------------------------- */
+
+.arrow-list {
+  margin: 20px 0;
+  padding: 0;
+  list-style: none;
+}
+.arrow-list > li {
+  position: relative;
+  margin: 0 0 9px;
+  padding-left: 28px;
+}
+.arrow-list > li::before {
+  content: "\2192";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ---------- callouts ---------------------------------------------------- */
+
+.callout {
+  margin: 22px 0;
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.98rem;
+}
+.callout-label {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.callout--warning {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+  border-color: var(--warn-border);
+  border-left-color: var(--warn);
+}
+.callout--warning .callout-label { color: var(--warn); }
+.callout--verdict { background: var(--accent-soft); border-color: var(--accent-border); border-left-color: var(--accent-strong); }
+.callout--source, .callout--author { border-left-color: var(--border-strong); }
+.callout--source .callout-label, .callout--author .callout-label { color: var(--text-muted); }
+.callout--source { font-size: 0.92rem; color: var(--text-muted); }
+
+/* note is the base appearance; the modifier exists so that every callout in a
+   document names its meaning explicitly */
+.callout--note { border-left-color: var(--accent); }
+.callout--rule { border-left-color: var(--text); background: var(--surface-3); }
+.callout--rule .callout-label { color: var(--text); }
+
+/* ---------- code -------------------------------------------------------- */
+
+.code { margin: 22px 0; }
+
+.code-label {
+  margin: 0 0 -1px;
+  display: inline-block;
+  padding: 5px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.code pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 2;
+}
+.code pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.code:not(:has(.code-label)) pre { border-radius: var(--radius-sm); }
+
+/* ---------- figures ------------------------------------------------------ */
+
+.figure { margin: 24px 0; }
+.figure a.zoom {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+  line-height: 0;
+}
+.figure img { display: block; width: 100%; height: auto; }
+.figure figcaption {
+  margin-top: 9px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ---------- lightbox ------------------------------------------------------ */
+
+.lightbox {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.lightbox::backdrop { background: rgba(0, 0, 0, 0.9); }
+
+.lightbox-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.lightbox-stage[data-panning] { cursor: grabbing; }
+.lightbox-stage img {
+  max-width: 96vw;
+  max-height: 92vh;
+  transform: translate(var(--lb-x, 0px), var(--lb-y, 0px)) scale(var(--lb-scale, 1));
+  transform-origin: center center;
+  transition: transform 0.08s linear;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.lightbox-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-2);
+}
+.lightbox-bar button {
+  font: inherit;
+  font-size: 0.8rem;
+  min-width: 38px;
+  padding: 7px 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.lightbox-bar button:hover { background: var(--surface-2); color: var(--text); }
+
+.lightbox-caption {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(80ch, 90vw);
+  padding: 8px 14px;
+  font-size: 0.86rem;
+  text-align: center;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.lightbox-caption:empty { display: none; }
+
+/* ---------- takeaway ------------------------------------------------------ */
+
+.takeaway {
+  margin: 56px 0 0;
+  padding: 28px 32px;
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  line-height: 1.45;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* ---------- responsive ------------------------------------------------------ */
+
+@media (max-width: 760px) {
+  body { padding: 0 16px 72px; font-size: 16px; }
+  .doc-header { padding-top: 96px; }
+  .card-toggle { grid-template-columns: 28px 1fr 16px 22px; gap: 9px; padding: 15px 14px; }
+  .card-body { padding: 0 16px 18px 16px; }
+  .detail-grid, .summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .sequence { grid-auto-flow: row; }
+  .sequence > li:not(:last-child)::after {
+    top: auto; right: auto; bottom: -9px; left: 22px;
+    transform: rotate(135deg);
+  }
+  .controls { top: auto; bottom: 12px; right: 12px; left: 12px; justify-content: center; flex-wrap: wrap; }
+}
+
+/* ---------- motion, print -------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Reading PDF: the full reference. Browser headers are replaced by page numbers
+   where margin boxes are supported. Other targets live in slides/sheet CSS. */
+@page {
+  size: A4;
+  margin: 16mm 17mm 18mm;
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font: 8pt -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #686868;
+  }
+}
+@page read-letter {
+  size: letter;
+  margin: 16mm 17mm 18mm;
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font: 8pt -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #686868;
+  }
+}
+@media print {
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { padding: 0; font-size: 11pt; background: var(--surface); }
+  .doc-header { padding-top: 0; }
+  :root[data-paper="letter"]:not([data-print="slides"]):not([data-print="sheet"]) .doc { page: read-letter; }
+  .controls, .slide-ui, .doc-nav, .doc-footer { display: none; }
+  .js .card-body, .js .reveal-body, .js .detail-body { display: block !important; }
+  html:not(.js) .tabpanel[hidden], .tabpanel[hidden] { display: block !important; }
+  .card { box-shadow: none; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  figure, svg, pre, .callout, .reveal-toggle, tr, .detail-tile { break-inside: avoid; }
+  p, li { orphans: 3; widows: 3; }
+  .card-head, .chapter-label, h1, h2, h3, h4 { break-after: avoid; }
+  .card-mark, .card-read, .detail-more { display: none; }
+  a { color: inherit; text-decoration: underline; }
+}
+</style>
+<style>
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 22px 0;
+}
+
+.overview-item {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.overview-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 0.73rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scope-note {
+  margin: 20px 0;
+  padding: 16px 20px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow: auto;
+  margin: 20px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.architecture-table {
+  margin: 0;
+  font-size: 0.87rem;
+}
+
+.architecture-table th {
+  background: var(--surface-2);
+}
+
+.architecture-table td {
+  min-width: 9rem;
+  overflow-wrap: anywhere;
+}
+
+.architecture-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.architecture-figure {
+  min-width: 0;
+  max-width: 100%;
+  margin: 28px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.diagram-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.diagram-label {
+  color: var(--text);
+  font-size: 0.81rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.diagram-focus,
+.diagram-popup-close {
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  cursor: pointer;
+  -webkit-tap-highlight-color: var(--accent-soft);
+}
+
+.diagram-focus { display: none; }
+html[data-architecture-ready] .diagram-focus { display: inline-flex; }
+
+.diagram-focus:hover,
+.diagram-popup-close:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.diagram-focus[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.diagram-scroll {
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+}
+
+.architecture-svg {
+  display: block;
+  width: 100%;
+  min-width: 1000px;
+  height: auto;
+  font-family: var(--font-sans);
+  background: var(--surface);
+}
+
+.architecture-svg text {
+  fill: var(--text);
+  stroke: none;
+}
+
+.architecture-svg .zone {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+  rx: 14px;
+}
+
+.architecture-svg .zone-inner {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-dasharray: 6 4;
+}
+
+.architecture-svg .zone-label {
+  fill: var(--text-muted);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.8px;
+}
+
+.architecture-svg .small-label,
+.architecture-svg .svg-note {
+  fill: var(--text-muted);
+  font-size: 13px;
+}
+
+.architecture-svg .arch-node {
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: var(--accent-soft);
+}
+
+.architecture-svg .arch-node > rect {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  rx: 9px;
+}
+
+.architecture-svg .optional-node > rect {
+  stroke-dasharray: 6 4;
+}
+
+.architecture-svg .arch-node:hover > rect,
+.architecture-svg .arch-node:focus > rect,
+.architecture-svg .arch-node.is-active > rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+
+.architecture-svg .arch-node:focus { outline: none; }
+
+.architecture-svg .arch-node:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.architecture-svg .node-title {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.architecture-svg .node-sub {
+  fill: var(--text-muted);
+  font-size: 13px;
+}
+
+.architecture-svg .node-meta {
+  fill: var(--text-muted);
+  font-size: 12px;
+}
+
+.architecture-svg .edge {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.architecture-svg .optional-edge { stroke-dasharray: 7 5; }
+.architecture-svg .edge.is-active { opacity: 1; }
+
+.architecture-svg .edge-label {
+  fill: var(--text-muted);
+  font-size: 12px;
+  paint-order: stroke fill;
+  stroke: var(--surface);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+
+.architecture-svg .lane-line {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 5;
+}
+
+.architecture-svg .sequence-step {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.architecture-svg text.sequence-step {
+  fill: var(--text);
+  stroke: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.architecture-svg .step-circle {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.architecture-svg .step-number {
+  fill: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.architecture-svg .note-box {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  stroke-width: 1;
+  rx: 8px;
+}
+
+.architecture-svg .badge {
+  fill: var(--accent-soft);
+  stroke: var(--accent-border);
+  stroke-width: 1;
+  rx: 5px;
+}
+
+.architecture-svg text.badge {
+  fill: var(--accent);
+  stroke: none;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.architecture-svg .code-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.architecture-figure > figcaption {
+  padding: 13px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.diagram-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 14px 0;
+  color: var(--text-muted);
+  font-size: 0.81rem;
+}
+
+.legend-solid,
+.legend-dashed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-solid::before,
+.legend-dashed::before {
+  content: "";
+  width: 28px;
+  border-top: 2px solid var(--accent);
+}
+
+.legend-dashed::before { border-top-style: dashed; }
+
+.component-reference {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+html[data-architecture-ready] .component-reference[data-popup-reference] {
+  display: none;
+}
+
+.component-detail {
+  min-width: 0;
+  align-self: start;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  scroll-margin-top: 76px;
+}
+
+.component-detail > summary {
+  padding: 12px 16px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.component-detail > summary::marker { color: var(--accent); }
+.component-detail[open] > summary { border-bottom: 1px solid var(--border); }
+.component-detail:target { border-color: var(--accent); }
+
+.component-copy {
+  padding: 16px;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.detail-status {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+body.architecture-focus-open { overflow: hidden; }
+
+.architecture-figure.is-focused {
+  position: fixed;
+  inset: 12px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+  box-shadow: var(--shadow-2);
+}
+
+.architecture-figure.is-focused > .diagram-toolbar,
+.architecture-figure.is-focused > figcaption { flex: 0 0 auto; }
+
+.architecture-figure.is-focused > .diagram-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--surface);
+  overscroll-behavior: contain;
+}
+
+.architecture-figure.is-focused .architecture-svg { min-width: 1100px; }
+.architecture-figure.is-focused > figcaption { max-height: 20vh; overflow: auto; }
+
+.diagram-popup {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  width: 390px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+.diagram-popup[hidden],
+.diagram-popup [hidden] { display: none !important; }
+
+.diagram-popup-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.diagram-popup-title {
+  min-width: 0;
+  margin: 2px 0;
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.diagram-popup-close { flex-shrink: 0; }
+
+.diagram-popup-content {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.diagram-popup .component-copy {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+@media (pointer: coarse) {
+  .diagram-focus,
+  .diagram-popup-close { min-height: 44px; }
+}
+
+@media (max-width: 760px) {
+  .overview-grid,
+  .component-reference { grid-template-columns: minmax(0, 1fr); }
+  .architecture-figure { margin: 22px 0; }
+  .diagram-toolbar { padding: 10px 12px; }
+  .architecture-figure.is-focused { inset: 6px; }
+  .architecture-figure.is-focused > figcaption { font-size: 0.76rem; }
+}
+
+.component-reference > .chapter-label {
+  grid-column: 1 / -1;
+  margin: 24px 0 4px;
+}
+
+@page diagram {
+  size: A4 landscape;
+  margin: 12mm 14mm 14mm;
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font: 8pt -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #686868;
+  }
+}
+
+@media print {
+  .architecture-figure {
+    page: diagram;
+    margin: 0;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .architecture-figure.is-focused { position: static; display: block; }
+  .diagram-focus,
+  .diagram-popup,
+  .scope-note { display: none !important; }
+  .diagram-toolbar { background: transparent; }
+  .diagram-scroll,
+  .table-scroll { overflow: visible; }
+  .table-scroll { border: 0; }
+  .architecture-svg,
+  .architecture-figure.is-focused .architecture-svg {
+    min-width: 0;
+    width: 100%;
+    max-height: 150mm;
+  }
+  .architecture-svg .edge { opacity: 1; }
+  thead { display: table-header-group; }
+  html[data-architecture-ready] .component-reference[data-popup-reference] {
+    display: grid;
+    break-before: page;
+  }
+  .component-detail { break-inside: avoid; }
+  .component-detail > .component-copy { display: block !important; }
+}
+</style>
+<script>
+(function () {
+  function boot() {
+/* =========================================================================
+   html-docs / article runtime
+   Shared script for dynamic articles. Never edit per page.
+
+   This script adds behavior only. Every piece of content is already present
+   and readable in the HTML with JavaScript disabled.
+
+   Provides: card and reveal collapsing, expand/collapse all, tabs, detail-grid
+   dialogs, image lightbox with zoom and pan, and local reading progress.
+   Appearance and optional presentation are separate shared runtimes.
+   ========================================================================= */
+
+(() => {
+  "use strict";
+
+  const root = document.documentElement;
+
+  const els = (sel, scope) => Array.from((scope || document).querySelectorAll(sel));
+  const el = (sel, scope) => (scope || document).querySelector(sel);
+
+  window.HtmlDocs.refresh();
+  if (!el('[data-action="toggle-slides"]') && root.getAttribute("data-view") === "slides") root.removeAttribute("data-view");
+
+  /* ---------- collapsibles ------------------------------------------ */
+
+  function setOpen(container, toggle, open) {
+    if (open) {
+      container.setAttribute("data-open", "");
+    } else {
+      container.removeAttribute("data-open");
+    }
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function initCollapsible(container, toggleSel, bodySel) {
+    const toggle = el(toggleSel, container);
+    const body = el(bodySel, container);
+    if (!toggle || !body) return;
+
+    if (!body.id) {
+      body.id = (container.id || "sec-" + Math.random().toString(36).slice(2, 8)) + "-body";
+    }
+    toggle.setAttribute("aria-controls", body.id);
+
+    const startOpen = container.hasAttribute("data-open") ||
+      toggle.getAttribute("aria-expanded") === "true";
+    setOpen(container, toggle, startOpen);
+
+    toggle.addEventListener("click", () => {
+      const open = !container.hasAttribute("data-open");
+      setOpen(container, toggle, open);
+    });
+  }
+
+  /* Card numbers are a CSS counter so the page numbers itself without JS. In
+     slides mode non-current cards are display:none, which restarts the counter,
+     so freeze the numbers into the DOM once. The :empty rule in the stylesheet
+     then stops the counter from rendering a second value. */
+  let cardNumber = 0;
+  els(".card").forEach((card) => {
+    if (!card.id) {
+      card.id = "card-" + Math.random().toString(36).slice(2, 8);
+      card.setAttribute("data-auto-id", "");
+    }
+    const num = el(":scope > .card-head > .card-toggle > .card-num", card);
+    if (num && !card.classList.contains("card--lead")) {
+      cardNumber += 1;
+      num.textContent = cardNumber < 10 ? "0" + cardNumber : String(cardNumber);
+    }
+    initCollapsible(card, ":scope > .card-head > .card-toggle", ":scope > .card-body");
+  });
+
+  els(".reveal").forEach((reveal) => {
+    initCollapsible(reveal, ":scope > .reveal-toggle", ":scope > .reveal-body");
+  });
+
+  function setAllCards(open) {
+    els(".card").forEach((card) => {
+      const toggle = el(":scope > .card-head > .card-toggle", card);
+      if (toggle) setOpen(card, toggle, open);
+    });
+  }
+
+  els('[data-action="expand-all"]').forEach((b) =>
+    b.addEventListener("click", () => setAllCards(true)));
+  els('[data-action="collapse-all"]').forEach((b) =>
+    b.addEventListener("click", () => setAllCards(false)));
+
+  /* ---------- read tracking -------------------------------------------- */
+
+  /* A card is marked once it has been open and on screen long enough to have
+     actually been read. That is a different claim from "was clicked", which is
+     why this is measured rather than wired to the toggle. State is per
+     document and survives reloads, so a long article can be resumed. */
+
+  const cards = els(".card");
+
+  const READ_KEY = "doc-read:" + (() => {
+    const meta = el('meta[name="doc-id"]');
+    if (meta && meta.content) return meta.content;
+    return location.pathname.split("/").pop() || "index";
+  })();
+
+  /* Auto-generated ids are random per load, so they cannot key stored state.
+     Those cards fall back to their position. Authored ids survive edits. */
+  const cardKey = (card) =>
+    card.hasAttribute("data-auto-id") ? "n" + cards.indexOf(card) : card.id;
+
+  let readSet = new Set();
+  try {
+    readSet = new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
+  } catch (e) { readSet = new Set(); }
+
+  function persistRead() {
+    try { localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readSet))); }
+    catch (e) { /* private mode; marks simply do not persist */ }
+  }
+
+  function paintRead() {
+    cards.forEach((card) => {
+      card.setAttribute("data-read", readSet.has(cardKey(card)) ? "true" : "false");
+    });
+  }
+
+  const dwell = new Map();
+  document.addEventListener("html-docs:present", () => {
+    dwell.forEach(id => clearTimeout(id));
+    dwell.clear();
+  });
+
+  function clearDwell(card) {
+    if (!dwell.has(card)) return;
+    clearTimeout(dwell.get(card));
+    dwell.delete(card);
+  }
+
+  function startDwell(card) {
+    if (dwell.has(card)) return;
+    dwell.set(card, setTimeout(() => {
+      dwell.delete(card);
+      readSet.add(cardKey(card));
+      persistRead();
+      paintRead();
+    }, 900));
+  }
+
+  function scanRead() {
+    /* Slides mode shows one card at a time, full screen. Counting that as
+       reading would mark the whole article read the moment it is presented. */
+    if (root.getAttribute("data-view") === "slides") return;
+    const vh = window.innerHeight;
+    if (!vh) return;
+    cards.forEach((card) => {
+      if (readSet.has(cardKey(card))) return;
+      if (!card.hasAttribute("data-open")) { clearDwell(card); return; }
+      const box = card.getBoundingClientRect();
+      const visible = Math.min(box.bottom, vh) - Math.max(box.top, 0);
+      if (visible <= 0) { clearDwell(card); return; }
+      /* A card shorter than the viewport counts once half of it is showing.
+         A taller one counts only once its end has been reached, which is the
+         only honest signal that the reader passed through the whole thing. */
+      const enough = box.height > vh * 0.9
+        ? box.bottom <= vh + 24
+        : visible >= box.height * 0.5;
+      if (enough) startDwell(card); else clearDwell(card);
+    });
+  }
+
+  let scanQueued = false;
+  function queueScan() {
+    if (scanQueued) return;
+    scanQueued = true;
+    requestAnimationFrame(() => { scanQueued = false; scanRead(); });
+  }
+
+  if (cards.length) {
+    cards.forEach((card) => {
+      const toggle = el(":scope > .card-head > .card-toggle", card);
+      const mark = toggle && el(":scope > .card-mark", toggle);
+      if (!toggle || !mark) return;
+      const dot = document.createElement("span");
+      dot.className = "card-read";
+      dot.setAttribute("aria-hidden", "true");
+      toggle.insertBefore(dot, mark);
+    });
+
+    const controls = el(".controls");
+    if (controls) {
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "ctrl";
+      clear.setAttribute("data-action", "clear-read");
+      clear.textContent = "Clear marks";
+      clear.addEventListener("click", () => {
+        readSet.clear();
+        dwell.forEach((id) => clearTimeout(id));
+        dwell.clear();
+        persistRead();
+        paintRead();
+        queueScan();
+      });
+
+      controls.prepend(clear);
+    }
+
+    paintRead();
+    addEventListener("scroll", queueScan, { passive: true });
+    addEventListener("resize", queueScan, { passive: true });
+    document.addEventListener("click", (event) => {
+      if (event.target.closest(".card-toggle, [data-action]")) queueScan();
+    });
+    queueScan();
+  }
+
+  /* ---------- tabs ---------------------------------------------------- */
+
+  els(".tabs").forEach((group) => {
+    const tabs = els('[role="tab"]', group);
+    const panels = els('[role="tabpanel"]', group);
+    if (!tabs.length || tabs.length !== panels.length) return;
+
+    function select(index, focus) {
+      tabs.forEach((tab, i) => {
+        const active = i === index;
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+        tab.tabIndex = active ? 0 : -1;
+        panels[i].hidden = !active;
+      });
+      if (focus) tabs[index].focus();
+    }
+
+    let selected = tabs.findIndex((t) => t.getAttribute("aria-selected") === "true");
+    if (selected < 0) selected = 0;
+    select(selected, false);
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => {
+        selected = i;
+        select(i, false);
+      });
+      tab.addEventListener("keydown", (event) => {
+        const last = tabs.length - 1;
+        let next = null;
+        if (event.key === "ArrowRight") next = i === last ? 0 : i + 1;
+        else if (event.key === "ArrowLeft") next = i === 0 ? last : i - 1;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = last;
+        if (next === null) return;
+        event.preventDefault();
+        selected = next;
+        select(next, true);
+      });
+    });
+  });
+
+  /* ---------- detail grid dialog ---------------------------------------- */
+
+  let detailDialog = null;
+  let detailAnchor = null;
+  let detailSource = null;
+
+  function ensureDetailDialog() {
+    if (detailDialog) return detailDialog;
+    detailDialog = document.createElement("dialog");
+    detailDialog.className = "doc-dialog";
+    detailDialog.innerHTML =
+      '<div class="doc-dialog-head"><h2></h2>' +
+      '<button type="button" class="doc-dialog-close">Close</button></div>' +
+      '<div class="doc-dialog-body"></div>';
+    document.body.appendChild(detailDialog);
+    el(".doc-dialog-close", detailDialog).addEventListener("click", () => detailDialog.close());
+    detailDialog.addEventListener("close", restoreDetail);
+    return detailDialog;
+  }
+
+  function restoreDetail() {
+    if (detailSource && detailAnchor && detailAnchor.parentNode) {
+      detailAnchor.parentNode.insertBefore(detailSource, detailAnchor);
+      detailAnchor.remove();
+    }
+    detailSource = null;
+    detailAnchor = null;
+  }
+
+  els(".detail-tile").forEach((tile) => {
+    const button = el(".detail-open", tile);
+    const body = el(".detail-body", tile);
+    const title = el(".detail-title", tile);
+    if (!button || !body) return;
+
+    if (!body.id) body.id = "detail-" + Math.random().toString(36).slice(2, 8);
+    button.setAttribute("aria-controls", body.id);
+    button.setAttribute("aria-haspopup", "dialog");
+
+    button.addEventListener("click", () => {
+      const dialog = ensureDetailDialog();
+      restoreDetail();
+      el(".doc-dialog-head h2", dialog).textContent = title ? title.textContent : "Detail";
+      detailSource = body;
+      detailAnchor = document.createComment("detail-anchor");
+      body.parentNode.insertBefore(detailAnchor, body);
+      el(".doc-dialog-body", dialog).replaceChildren(body);
+      dialog.showModal();
+    });
+  });
+
+  /* ---------- lightbox --------------------------------------------------- */
+
+  let lightbox = null;
+  let lbScale = 1;
+  let lbX = 0;
+  let lbY = 0;
+
+  function lbApply() {
+    const stage = el(".lightbox-stage", lightbox);
+    stage.style.setProperty("--lb-scale", String(lbScale));
+    stage.style.setProperty("--lb-x", lbX + "px");
+    stage.style.setProperty("--lb-y", lbY + "px");
+  }
+
+  function lbZoom(factor) {
+    lbScale = Math.min(8, Math.max(1, lbScale * factor));
+    if (lbScale === 1) {
+      lbX = 0;
+      lbY = 0;
+    }
+    lbApply();
+  }
+
+  function ensureLightbox() {
+    if (lightbox) return lightbox;
+    lightbox = document.createElement("dialog");
+    lightbox.className = "lightbox";
+    lightbox.innerHTML =
+      '<div class="lightbox-stage"><img alt=""></div>' +
+      '<p class="lightbox-caption"></p>' +
+      '<div class="lightbox-bar">' +
+      '<button type="button" data-lb="out" aria-label="Zoom out">&minus;</button>' +
+      '<button type="button" data-lb="reset">Reset</button>' +
+      '<button type="button" data-lb="in" aria-label="Zoom in">+</button>' +
+      '<button type="button" data-lb="close">Close</button>' +
+      "</div>";
+    document.body.appendChild(lightbox);
+
+    const stage = el(".lightbox-stage", lightbox);
+
+    lightbox.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-lb]");
+      if (!action) return;
+      const kind = action.getAttribute("data-lb");
+      if (kind === "in") lbZoom(1.4);
+      else if (kind === "out") lbZoom(1 / 1.4);
+      else if (kind === "reset") { lbScale = 1; lbX = 0; lbY = 0; lbApply(); }
+      else lightbox.close();
+    });
+
+    lightbox.addEventListener("keydown", (event) => {
+      if (event.key === "+" || event.key === "=") { event.preventDefault(); lbZoom(1.4); }
+      else if (event.key === "-") { event.preventDefault(); lbZoom(1 / 1.4); }
+      else if (event.key === "0") { event.preventDefault(); lbScale = 1; lbX = 0; lbY = 0; lbApply(); }
+    });
+
+    stage.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      lbZoom(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+    }, { passive: false });
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    const pointers = new Map();
+    let pinchStart = 0;
+    let pinchScale = 1;
+
+    stage.addEventListener("pointerdown", (event) => {
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      stage.setPointerCapture(event.pointerId);
+      if (pointers.size === 2) {
+        const [a, b] = Array.from(pointers.values());
+        pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
+        pinchScale = lbScale;
+        dragging = false;
+        return;
+      }
+      if (lbScale > 1) {
+        dragging = true;
+        startX = event.clientX - lbX;
+        startY = event.clientY - lbY;
+        stage.setAttribute("data-panning", "");
+      }
+    });
+
+    stage.addEventListener("pointermove", (event) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (pointers.size === 2 && pinchStart > 0) {
+        const [a, b] = Array.from(pointers.values());
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        lbScale = Math.min(8, Math.max(1, pinchScale * (dist / pinchStart)));
+        if (lbScale === 1) { lbX = 0; lbY = 0; }
+        lbApply();
+        return;
+      }
+      if (!dragging) return;
+      lbX = event.clientX - startX;
+      lbY = event.clientY - startY;
+      lbApply();
+    });
+
+    const endPointer = (event) => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinchStart = 0;
+      if (pointers.size === 0) {
+        dragging = false;
+        stage.removeAttribute("data-panning");
+      }
+    };
+    stage.addEventListener("pointerup", endPointer);
+    stage.addEventListener("pointercancel", endPointer);
+
+    return lightbox;
+  }
+
+  els("a.zoom").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      const dialog = ensureLightbox();
+      const image = el(".lightbox-stage img", dialog);
+      const source = el("img", link);
+      image.src = link.getAttribute("href");
+      image.alt = source ? source.alt : "";
+      const figure = link.closest("figure");
+      const caption = figure ? el("figcaption", figure) : null;
+      el(".lightbox-caption", dialog).textContent = caption ? caption.textContent : "";
+      lbScale = 1;
+      lbX = 0;
+      lbY = 0;
+      lbApply();
+      dialog.showModal();
+    });
+  });
+
+  /* ---------- deep links ------------------------------------------------ */
+
+  function openAncestors(node) {
+    let current = node;
+    while (current && current !== document.body) {
+      if (current.classList && (current.classList.contains("card") || current.classList.contains("reveal"))) {
+        const toggle = el(":scope > .card-head > .card-toggle", current) ||
+          el(":scope > .reveal-toggle", current);
+        if (toggle) setOpen(current, toggle, true);
+      }
+      current = current.parentElement;
+    }
+  }
+
+  function revealHash() {
+    if (root.getAttribute("data-view") === "slides") return;
+    const id = location.hash.slice(1);
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    openAncestors(target);
+    target.scrollIntoView({ block: "start" });
+  }
+
+  window.addEventListener("hashchange", revealHash);
+  revealHash();
+})();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else { boot(); }
+})();
+</script>
+<script>
+(function () {
+  function boot() {
+(() => {
+  "use strict";
+
+  function init() {
+    const figures = [...document.querySelectorAll("[data-diagram]")];
+    if (!figures.length || document.documentElement.hasAttribute("data-architecture-ready")) return;
+
+    const nodes = figures.flatMap(figure => [...figure.querySelectorAll(".arch-node[data-detail]")]);
+    const details = [...document.querySelectorAll(".component-detail")];
+    const popup = document.createElement("aside");
+    popup.className = "diagram-popup";
+    popup.id = uniqueId("architecture-popup");
+    popup.hidden = true;
+    const head = document.createElement("div");
+    head.className = "diagram-popup-head";
+    const heading = document.createElement("h2");
+    heading.className = "diagram-popup-title";
+    heading.id = uniqueId("architecture-popup-title");
+    const close = document.createElement("button");
+    close.className = "diagram-popup-close";
+    close.type = "button";
+    close.textContent = "Close";
+    close.setAttribute("aria-label", "Close component details");
+    const content = document.createElement("div");
+    content.className = "diagram-popup-content";
+    head.append(heading, close);
+    popup.append(head, content);
+    popup.setAttribute("aria-labelledby", heading.id);
+    document.body.append(popup);
+
+    let activeNode = null;
+    let pointerNode = null;
+    let pointerInPopup = false;
+    let pinned = false;
+    let dismissTimer = 0;
+    let positionFrame = 0;
+    let focusVersion = 0;
+    let ignoreFocus = null;
+    let focusState = null;
+    let printState = null;
+    let printTheme = null;
+
+    function uniqueId(base) {
+      let id = base;
+      let suffix = 1;
+      while (document.getElementById(id)) id = `${base}-${suffix++}`;
+      return id;
+    }
+
+    function detailFor(node) {
+      const detail = document.getElementById(node.dataset.detail);
+      return detail?.matches(".component-detail") ? detail : null;
+    }
+
+    function highlight(node, on) {
+      node.classList.toggle("is-active", on);
+      node.classList.toggle("is-pinned", on && pinned);
+      node.setAttribute("aria-expanded", String(on));
+      node.closest("[data-diagram]").querySelectorAll(".edge[data-from], .edge[data-to]").forEach(edge => {
+        edge.classList.toggle("is-active", on &&
+          (edge.dataset.from === node.dataset.detail || edge.dataset.to === node.dataset.detail));
+      });
+    }
+
+    function positionPopup() {
+      positionFrame = 0;
+      if (!activeNode || popup.hidden) return;
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft || 0;
+      const top = viewport?.offsetTop || 0;
+      const width = viewport?.width || window.innerWidth;
+      const height = viewport?.height || window.innerHeight;
+      const margin = 12;
+      const gap = 12;
+      popup.style.maxWidth = `${Math.max(1, width - margin * 2)}px`;
+      popup.style.maxHeight = `${Math.max(1, height - margin * 2)}px`;
+      const box = activeNode.getBoundingClientRect();
+      const size = popup.getBoundingClientRect();
+      let x = box.right + gap;
+      let y = box.top;
+      if (x + size.width > left + width - margin) x = box.left - size.width - gap;
+      if (x < left + margin) {
+        x = box.left;
+        y = box.bottom + gap;
+        if (y + size.height > top + height - margin) y = box.top - size.height - gap;
+      }
+      popup.style.left = `${Math.max(left + margin, Math.min(x, left + width - size.width - margin))}px`;
+      popup.style.top = `${Math.max(top + margin, Math.min(y, top + height - size.height - margin))}px`;
+    }
+
+    function queuePosition() {
+      if (!positionFrame) positionFrame = requestAnimationFrame(positionPopup);
+    }
+
+    function hidePopup(restoreFocus = false) {
+      clearTimeout(dismissTimer);
+      focusVersion++;
+      const previous = activeNode;
+      if (previous) highlight(previous, false);
+      activeNode = null;
+      pinned = false;
+      pointerInPopup = false;
+      popup.hidden = true;
+      popup.removeAttribute("aria-modal");
+      if (restoreFocus && previous?.isConnected) {
+        ignoreFocus = previous;
+        previous.focus({ preventScroll: true });
+        ignoreFocus = null;
+      }
+    }
+
+    function dismissSoon() {
+      clearTimeout(dismissTimer);
+      dismissTimer = setTimeout(() => {
+        if (!pinned && activeNode && pointerNode !== activeNode && !pointerInPopup &&
+          !activeNode.contains(document.activeElement) && !popup.contains(document.activeElement)) hidePopup();
+      }, 240);
+    }
+
+    function showPopup(node, pin = false, keyboard = false) {
+      if (pinned && !pin) return;
+      const detail = detailFor(node);
+      const summary = detail?.querySelector(":scope > summary");
+      const copy = detail?.querySelector(":scope > .component-copy");
+      if (!summary || !copy) return;
+      clearTimeout(dismissTimer);
+      if (activeNode !== node) {
+        if (activeNode) highlight(activeNode, false);
+        const clone = copy.cloneNode(true);
+        [clone, ...clone.querySelectorAll("[id]")].forEach(element => element.removeAttribute("id"));
+        clone.querySelectorAll("[aria-labelledby], [aria-describedby], [aria-controls], [for]").forEach(element => {
+          ["aria-labelledby", "aria-describedby", "aria-controls", "for"].forEach(name => element.removeAttribute(name));
+        });
+        heading.textContent = summary.textContent.trim();
+        content.replaceChildren(clone);
+        content.scrollTop = 0;
+      }
+      activeNode = node;
+      pinned = pin;
+      popup.setAttribute("role", pin ? "dialog" : "region");
+      if (pin) popup.setAttribute("aria-modal", "false");
+      else popup.removeAttribute("aria-modal");
+      close.hidden = !pin;
+      popup.hidden = false;
+      highlight(node, true);
+      positionPopup();
+      if (pin && keyboard) close.focus({ preventScroll: true });
+    }
+
+    function openAncestors(target) {
+      for (let current = target; current && current !== document.body; current = current.parentElement) {
+        if (current.matches("details")) current.open = true;
+        if (current.matches(".card, .reveal")) {
+          current.setAttribute("data-open", "");
+          current.querySelector(":scope > .card-head > .card-toggle, :scope > .reveal-toggle")
+            ?.setAttribute("aria-expanded", "true");
+        }
+      }
+    }
+
+    function hashTarget(hash = location.hash) {
+      try { return document.getElementById(decodeURIComponent(hash.slice(1))); }
+      catch { return null; }
+    }
+
+    function revealHash() {
+      const target = hashTarget();
+      const detail = target?.closest(".component-detail");
+      const node = nodes.find(candidate => candidate.dataset.detail === detail?.id);
+      if (!node) return;
+      if (focusState) exitFocus(false);
+      hidePopup();
+      openAncestors(node);
+      node.scrollIntoView({ block: "center" });
+      requestAnimationFrame(() => showPopup(node, true));
+    }
+
+    function exitFocus(restoreFocus = true) {
+      if (!focusState) return;
+      hidePopup();
+      const { figure, button, placeholder, label, role, ariaLabel, scrollX, scrollY } = focusState;
+      focusState = null;
+      figure.classList.remove("is-focused");
+      if (role === null) figure.removeAttribute("role");
+      else figure.setAttribute("role", role);
+      if (ariaLabel === null) figure.removeAttribute("aria-label");
+      else figure.setAttribute("aria-label", ariaLabel);
+      placeholder.replaceWith(figure);
+      document.body.classList.remove("architecture-focus-open");
+      button.textContent = label;
+      button.setAttribute("aria-pressed", "false");
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: "instant" });
+      if (restoreFocus) button.focus({ preventScroll: true });
+    }
+
+    function enterFocus(figure, button) {
+      if (focusState?.figure === figure) {
+        exitFocus();
+        return;
+      }
+      if (focusState) exitFocus(false);
+      hidePopup();
+      const placeholder = document.createComment("diagram focus location");
+      focusState = {
+        figure, button, placeholder, label: button.textContent,
+        role: figure.getAttribute("role"), ariaLabel: figure.getAttribute("aria-label"),
+        scrollX: window.scrollX, scrollY: window.scrollY
+      };
+      figure.before(placeholder);
+      document.body.insertBefore(figure, popup);
+      figure.classList.add("is-focused");
+      figure.setAttribute("role", "region");
+      figure.setAttribute("aria-label", `${figure.querySelector(".diagram-label")?.textContent.trim() || "Architecture"} diagram focus view`);
+      document.body.classList.add("architecture-focus-open");
+      button.textContent = "Exit focus";
+      button.setAttribute("aria-pressed", "true");
+      button.focus({ preventScroll: true });
+    }
+
+    details.forEach(detail => { detail.open = false; });
+
+    nodes.forEach(node => {
+      if (!detailFor(node)) return;
+      node.setAttribute("aria-controls", popup.id);
+      node.setAttribute("aria-expanded", "false");
+      node.setAttribute("aria-haspopup", "dialog");
+      node.addEventListener("pointerenter", event => {
+        if (event.pointerType === "touch") return;
+        pointerNode = node;
+        showPopup(node);
+      });
+      node.addEventListener("pointerleave", event => {
+        if (event.pointerType === "touch") return;
+        if (pointerNode === node) pointerNode = null;
+        dismissSoon();
+      });
+      node.addEventListener("focus", () => {
+        if (ignoreFocus === node || pinned) return;
+        hidePopup();
+        const version = focusVersion;
+        // Native keyboard focus can scroll a tall diagram before its next paint.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (version === focusVersion && document.activeElement === node) showPopup(node);
+        }));
+      });
+      node.addEventListener("blur", dismissSoon);
+      node.addEventListener("click", event => {
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        showPopup(node, true, event.detail === 0);
+      });
+      node.addEventListener("keydown", event => {
+        if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        event.preventDefault();
+        if (!event.repeat) showPopup(node, true, true);
+      });
+    });
+
+    figures.forEach(figure => {
+      const button = figure.querySelector(".diagram-focus");
+      const scroll = figure.querySelector(".diagram-scroll");
+      if (button) {
+        button.setAttribute("aria-pressed", "false");
+        button.addEventListener("click", () => enterFocus(figure, button));
+      }
+      if (scroll) {
+        scroll.tabIndex = 0;
+        scroll.setAttribute("role", "region");
+        scroll.setAttribute("aria-label", `${figure.querySelector(".diagram-label")?.textContent.trim() || "Architecture"} diagram; scroll to explore`);
+      }
+    });
+
+    popup.addEventListener("pointerenter", () => {
+      pointerInPopup = true;
+      clearTimeout(dismissTimer);
+    });
+    popup.addEventListener("pointerleave", () => {
+      pointerInPopup = false;
+      dismissSoon();
+    });
+    popup.addEventListener("focusout", dismissSoon);
+    close.addEventListener("click", () => hidePopup(true));
+
+    document.addEventListener("pointerdown", event => {
+      if (activeNode && !popup.contains(event.target) && !activeNode.contains(event.target)) hidePopup();
+    });
+
+    document.addEventListener("focusin", event => {
+      if (focusState && !focusState.figure.contains(event.target) && !popup.contains(event.target)) exitFocus(false);
+      if (pinned && !popup.contains(event.target) && !activeNode?.contains(event.target) &&
+        !event.target.closest(".arch-node")) hidePopup();
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      focusVersion++;
+      if (activeNode) {
+        event.preventDefault();
+        hidePopup(pinned || popup.contains(document.activeElement));
+      } else if (focusState) {
+        event.preventDefault();
+        exitFocus();
+      }
+    });
+
+    document.addEventListener("click", event => {
+      if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target.closest("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (!href?.startsWith("#")) return;
+      const target = hashTarget(href);
+      if (!target?.closest(".component-detail")) return;
+      event.preventDefault();
+      if (location.hash === href) revealHash();
+      else location.hash = href;
+    });
+
+    document.addEventListener("scroll", event => {
+      if (!activeNode || popup.contains(event.target)) return;
+      if (pinned || activeNode.contains(document.activeElement)) queuePosition();
+      else hidePopup();
+    }, true);
+    window.addEventListener("resize", queuePosition, { passive: true });
+    window.visualViewport?.addEventListener("resize", queuePosition, { passive: true });
+    window.visualViewport?.addEventListener("scroll", queuePosition, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(queuePosition).observe(popup);
+    window.addEventListener("hashchange", revealHash);
+    window.addEventListener("beforeprint", () => {
+      exitFocus();
+      hidePopup();
+      if (!printState) {
+        printState = details.map(detail => [detail, detail.open]);
+        printTheme = document.documentElement.getAttribute("data-theme");
+      }
+      document.documentElement.setAttribute("data-theme", "light");
+      details.forEach(detail => { detail.open = true; });
+    });
+    window.addEventListener("afterprint", () => {
+      printState?.forEach(([detail, open]) => { detail.open = open; });
+      if (printTheme) document.documentElement.setAttribute("data-theme", printTheme);
+      printState = null;
+      printTheme = null;
+    });
+    document.documentElement.setAttribute("data-architecture-ready", "");
+    revealHash();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });
+  else init();
+})();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else { boot(); }
+})();
+</script>
+</head>
+
+<body>
+
+<div class="controls" role="group" aria-label="Article controls">
+  <button type="button" class="ctrl" data-action="expand-all">Expand all</button>
+  <button type="button" class="ctrl" data-action="collapse-all">Collapse all</button>
+  <button type="button" class="ctrl" data-action="print" aria-label="Save the current view as PDF or print it">PDF</button>
+  <button type="button" class="ctrl" data-action="toggle-theme">Dark</button>
+  <button type="button" class="ctrl" data-action="toggle-accent">Accent: Blue</button>
+</div>
+
+<div class="doc">
+
+  <header class="doc-header" id="opening">
+    <p class="eyebrow">Autopilots on Azure / 3 of 3</p>
+    <h1>Azure implementation</h1>
+    <p class="subtitle">Which Azure resources, identities, and lifecycle rules run the reference deployment, and what changes for production.</p>
+  </header>
+
+  <nav class="doc-nav" aria-label="Architecture documents">
+    <a href="architecture.html">Architecture</a>
+    <a href="collective-learning.html">Collective learning</a>
+    <a href="azure-implementation.html" aria-current="page">Azure implementation</a>
+  </nav>
+
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-label">Contents</p>
+    <ol>
+      <li><a href="#ch-topology">Deployed topology</a></li>
+      <li><a href="#ch-access">Identity and access</a></li>
+      <li><a href="#ch-lifecycle">Deployment and lifecycle</a></li>
+      <li><a href="#ch-observability">Observability</a></li>
+      <li><a href="#ch-hardening">Production hardening</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section class="chapter" id="ch-topology">
+      <h2 class="chapter-label">Deployed topology</h2>
+      <article class="card card--lead" id="card-deployment" data-open>
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="true"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Each Worker gets five Sandbox Groups; shared services stay in one resource group.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>The reference deployment runs two Workers, <code>hermes</code> and <code>hermes2</code>, in one resource group. Sandbox Groups, Foundry, and monitoring run in Sweden Central; Service Bus, Container Registry, and the workload VNet run in North Europe.</p>
+          <p>The dependency base pins Hermes 0.22.6. Source releases, compute identity, and channel registration are independent. Each Worker also has a native managed receiver resource; it is not another always-on Sandbox.</p>
+          <p class="scope-note">Hover or focus a component to inspect it. Click, tap, or press Enter to pin its explanation; Escape dismisses it. Use <strong>Focus diagram</strong> for a larger view. The PDF lists every explanation in a component reference after the takeaway.</p>
+          <div class="diagram-legend"><span class="legend-solid">Solid: connection in use</span><span class="legend-dashed">Dashed: optional connection or component</span></div>
+          <figure class="architecture-figure" data-diagram id="diagram-azure">
+            <div class="diagram-toolbar"><span class="diagram-label">01 / Deployed Azure topology</span><button class="diagram-focus" type="button">Focus diagram</button></div>
+            <div class="diagram-scroll">
+              <svg class="architecture-svg" viewBox="0 0 1100 720" role="group" aria-labelledby="azure-title azure-desc">
+                <title id="azure-title">Deployed Azure resources for two Workers</title>
+                <desc id="azure-desc">Agent 365 calls each gateway, which immediately uses native Runs over OnDemand HTTPS. Five Sandbox Groups isolate gateway, runtime, generated apps and both MCP services. A recovery queue and scheduling queue have native gateway wake receivers; source polling is not an interactive request/result dependency. The runtime calls Foundry and private MCP directly.</desc>
+                <defs><marker id="az-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs>
+                <rect class="zone" x="10" y="120" width="1080" height="590" rx="18"/><text class="zone-label" x="690" y="148">RESOURCE GROUP rg-autopilots-&lt;suffix&gt;</text>
+                <rect class="zone zone-inner" x="30" y="160" width="1040" height="170" rx="12"/><text class="small-label" x="682" y="322">PER WORKER × 2: FIVE SANDBOX GROUPS</text>
+                <rect class="zone zone-inner" x="30" y="370" width="530" height="330" rx="12"/><text class="small-label" x="50" y="688">SHARED SERVICES</text>
+                <rect class="zone zone-inner" x="580" y="370" width="490" height="330" rx="12"/><text class="small-label" x="600" y="688">NETWORK</text>
+                <path class="edge" data-from="az-teams" data-to="az-agent365" d="M290 55H240" marker-end="url(#az-arrow)"/>
+                <path class="edge" data-from="az-agent365" data-to="az-gateway" d="M130 90V205" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="140" y="140">public HTTPS /api/messages</text>
+                <path class="edge" data-from="az-gateway" data-to="az-runtime" d="M230 250H260" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="216" y="195">native HTTPS</text>
+                <path class="edge" data-from="az-runtime" data-to="az-public-mcp" d="M350 205V182H770V205" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="530" y="176">public HTTPS</text>
+                <path class="edge" data-from="az-gateway" data-to="az-servicebus" d="M110 305V410" marker-start="url(#az-arrow)" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="118" y="352">recovery / wake</text>
+                <path class="edge" data-from="az-runtime" data-to="az-servicebus" d="M285 305V385H230V410" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="293" y="345">next cron occurrence</text>
+                <path class="edge" data-from="az-runtime" data-to="az-foundry" d="M400 305V410" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="408" y="395">Entra token</text>
+                <path class="edge" data-from="az-runtime" data-to="az-vnet-sandbox" d="M440 285H455V345H575V607H600" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="462" y="338">VNet connection</text>
+                <path class="edge" data-from="az-vnet-sandbox" data-to="az-vnet" d="M700 560V505" marker-start="url(#az-arrow)" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="710" y="537">peering</text>
+                <path class="edge" data-from="az-vnet" data-to="az-express" d="M800 457H850" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="806" y="447">PE</text>
+                <path class="edge" data-from="az-express" data-to="az-private-mcp" d="M970 410V305" marker-end="url(#az-arrow)"/>
+                <text class="edge-label" x="978" y="362">linked group</text>
+                <a class="arch-node" href="#az-agent365" data-detail="az-agent365" aria-label="Agent 365: details"><rect x="20" y="20" width="220" height="70" rx="10"/><text class="node-title" x="36" y="50">Agent 365</text><text class="node-sub" x="36" y="74">Agent Identity + Agent User</text></a>
+                <a class="arch-node" href="#az-teams" data-detail="az-teams" aria-label="Teams / Microsoft 365: details"><rect x="290" y="20" width="220" height="70" rx="10"/><text class="node-title" x="306" y="50">Teams / Microsoft 365</text><text class="node-sub" x="306" y="74">Users and documents</text></a>
+                <a class="arch-node" href="#az-gateway" data-detail="az-gateway" aria-label="Gateway: details"><rect x="50" y="205" width="180" height="100" rx="10"/><text class="node-title" x="66" y="237">Gateway</text><text class="node-sub" x="66" y="263">Durable admission</text><text class="node-meta" x="66" y="285">Memory suspend</text></a>
+                <a class="arch-node" href="#az-runtime" data-detail="az-runtime" aria-label="Agent runtime: details"><rect x="260" y="205" width="180" height="100" rx="10"/><text class="node-title" x="276" y="237">Agent runtime</text><text class="node-sub" x="276" y="263">Hermes + Blob backups</text><text class="node-meta" x="276" y="285">Suspends to memory</text></a>
+                <a class="arch-node" href="#az-apps" data-detail="az-apps" aria-label="Generated apps: details"><rect x="470" y="205" width="180" height="100" rx="10"/><text class="node-title" x="486" y="237">Generated apps</text><text class="node-sub" x="486" y="263">One Sandbox per app</text><text class="node-meta" x="486" y="285">Entra-only ports</text></a>
+                <a class="arch-node" href="#az-public-mcp" data-detail="az-public-mcp" aria-label="Public MCP: details"><rect x="680" y="205" width="180" height="100" rx="10"/><text class="node-title" x="696" y="237">Public MCP</text><text class="node-sub" x="696" y="263">Shipments server</text><text class="node-meta" x="696" y="285">Public HTTPS + Entra</text></a>
+                <a class="arch-node" href="#az-private-mcp" data-detail="az-private-mcp" aria-label="Private MCP: details"><rect x="890" y="205" width="160" height="100" rx="10"/><text class="node-title" x="906" y="237">Private MCP</text><text class="node-sub" x="906" y="263">Incidents server</text><text class="node-meta" x="906" y="285">Private ingress</text></a>
+                <a class="arch-node" href="#az-servicebus" data-detail="az-servicebus" aria-label="Service Bus and native receivers: details"><rect x="50" y="410" width="220" height="95" rx="10"/><text class="node-title" x="66" y="442">Queues + native wake</text><text class="node-sub" x="66" y="468">Recovery + scheduling</text><text class="node-meta" x="66" y="490">Entra / gateway connection</text></a>
+                <a class="arch-node" href="#az-foundry" data-detail="az-foundry" aria-label="Foundry: details"><rect x="320" y="410" width="220" height="95" rx="10"/><text class="node-title" x="336" y="442">Foundry</text><text class="node-sub" x="336" y="468">S0 project, gpt-6.1-sol</text><text class="node-meta" x="336" y="490">Entra only, public</text></a>
+                <a class="arch-node" href="#az-acr" data-detail="az-acr" aria-label="Container Registry: details"><rect x="50" y="560" width="220" height="95" rx="10"/><text class="node-title" x="66" y="592">Container Registry</text><text class="node-sub" x="66" y="618">Runtime dependencies only</text><text class="node-meta" x="66" y="640">Basic / no admin user</text></a>
+                <a class="arch-node" href="#az-monitor" data-detail="az-monitor" aria-label="Azure Monitor: details"><rect x="320" y="560" width="220" height="95" rx="10"/><text class="node-title" x="336" y="592">Azure Monitor</text><text class="node-sub" x="336" y="618">Logs + App Insights</text><text class="node-meta" x="336" y="640">Entra-only ingestion</text></a>
+                <a class="arch-node" href="#az-vnet" data-detail="az-vnet" aria-label="vnet-autopilots: details"><rect x="600" y="410" width="200" height="95" rx="10"/><text class="node-title" x="616" y="442">vnet-autopilots</text><text class="node-sub" x="616" y="468">10.42.0.0/16, PE subnet</text><text class="node-meta" x="616" y="490">North Europe</text></a>
+                <a class="arch-node" href="#az-express" data-detail="az-express" aria-label="Express env: details"><rect x="850" y="410" width="200" height="95" rx="10"/><text class="node-title" x="866" y="442">Express env</text><text class="node-sub" x="866" y="468">apmcp, private ingress</text><text class="node-meta" x="866" y="490">Public access disabled</text></a>
+                <a class="arch-node" href="#az-vnet-sandbox" data-detail="az-vnet-sandbox" aria-label="vnet-sandbox: details"><rect x="600" y="560" width="200" height="95" rx="10"/><text class="node-title" x="616" y="592">vnet-sandbox</text><text class="node-sub" x="616" y="618">10.44.0.0/16, delegated</text><text class="node-meta" x="616" y="640">Sweden Central</text></a>
+                <a class="arch-node" href="#az-dns" data-detail="az-dns" aria-label="Private DNS: details"><rect x="850" y="560" width="200" height="95" rx="10"/><text class="node-title" x="866" y="592">Private DNS</text><text class="node-sub" x="866" y="618">privatelink zone</text><text class="node-meta" x="866" y="640">Linked to both VNets</text></a>
+              </svg>
+            </div>
+            <figcaption>Service Bus, Foundry, Container Registry, and Azure Monitor use Entra authentication on public endpoints. Only the private MCP path is private.</figcaption>
+          </figure>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../terraform/platform/">Platform layer</a> · <a href="../terraform/apps/main.tf">Worker layer</a> · <a href="../terraform/platform/networking.tf">Networking</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-access">
+      <h2 class="chapter-label">Identity and access</h2>
+      <article class="card" id="card-roles">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Separate send, receive, callback, and settlement authority.</span><span class="card-sub">Permanent roles are declarative; bootstrap write grants are temporary.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>Each Sandbox Group keeps its user-assigned identity. A separate native receiver resource has a system identity. Azure integrations use Entra; existing operator and runtime-local API credentials remain application boundaries. No registry key, SAS connection string, or new application secret is introduced.</p>
+          <div class="table-scroll"><table class="architecture-table"><thead><tr><th>Principal</th><th>Role</th><th>Scope</th></tr></thead><tbody>
+            <tr><td>Pinned deployer</td><td>Sandbox Data Owner</td><td>All five Worker groups; unchanged by operator login</td></tr>
+            <tr><td>Gateway identity</td><td>Sandbox Data Owner</td><td>Generated-apps Group only</td></tr>
+            <tr><td>Runtime identity</td><td>OpenAI User and AcrPull</td><td>Foundry account and runtime dependency registry</td></tr>
+            <tr><td>Gateway identity</td><td>Service Bus Data Sender</td><td>Recovery and enabled scheduling queue</td></tr>
+            <tr><td>Native receiver system identity</td><td>Data Receiver; Sandbox Data Owner</td><td>Worker queues; gateway callback group only</td></tr>
+            <tr><td>Gateway identity</td><td>Native connection named actions</td><td>Its own immutable-creator connection</td></tr>
+            <tr><td>Agent Identity</td><td>Service Bus Data Sender</td><td>Scheduling queue</td></tr>
+            <tr><td>Runtime and gateway identities</td><td>Monitoring Metrics Publisher</td><td>Application Insights</td></tr>
+          </tbody></table></div>
+          <p>Sandbox Data Owner permits more than execution, and the connection action wildcard permits more than completion. These are explicit preview-platform tradeoffs, not absolute least privilege. Deployment creates bounded bootstrap grants, verifies the caller-owned resource, and removes those grants in <code>finally</code>.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../terraform/apps/main.tf">Worker role assignments</a> · <a href="../terraform/apps/monitoring.tf">Monitoring roles</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-agent365">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Agent 365 objects come from scripts, not Terraform.</span><span class="card-sub">Blueprint, Agent Identity, and Agent User are Entra objects managed outside Terraform.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ol class="steps">
+            <li><h4>Create identities</h4><p><code>worker_lifecycle bootstrap</code> creates the agent blueprint, Agent Identity, and licensed Agent User, and requests the delegated Microsoft 365 permissions.</p></li>
+            <li><h4>Federate the managed identities</h4><p><code>setup_identity</code> writes blueprint federated credentials for the gateway and runtime managed identities. It runs under a login that directly owns the blueprint.</p></li>
+            <li><h4>Register the endpoint</h4><p><code>setup_agent365</code> sets the messaging endpoint to the gateway URL plus <code>/api/messages</code> and publishes the Agent User package.</p></li>
+          </ol>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../DEPLOYMENT.md">Deployment</a> · <a href="../scripts/setup_agent365.py">Agent 365 setup</a> · <a href="../autopilots_identity/">Token exchange</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-lifecycle">
+      <h2 class="chapter-label">Deployment and lifecycle</h2>
+      <article class="card" id="card-layers">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Two Terraform layers; one workspace per Worker.</span><span class="card-sub">Infrastructure, images, and Sandboxes are separate, explicit steps.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <div class="summary-grid">
+            <div class="summary-item"><span class="summary-label">platform</span>Resource group, registry, Service Bus namespace, Foundry, monitoring, VNets, Express environment, private endpoint, and DNS.</div>
+            <div class="summary-item"><span class="summary-label">apps</span>Per-Worker identities, groups, native receiver, queues, VNet connections, and permanent roles. Workspaces <code>autopilot-hermes</code> and <code>autopilot-hermes2</code>.</div>
+          </div>
+          <p>Build the runtime dependency image only when its pinned Hermes, installed packages, or compiled tools change. A source-only deployment packages the current files, verifies hashes, reuses prepared dependencies, and switches the supervised process in place. The deployment script creates caller-owned connections and fixed native receivers after services are healthy.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../DEPLOYMENT.md">Deployment commands</a> · <a href="../scripts/sandbox_services.py">Service deployment</a> · <a href="../scripts/sandbox_runtime.py">Runtime deployment</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-images">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Registry conversion belongs to deployment.</span><span class="card-sub">Running workloads receive prepared disk-image IDs, not registry credentials.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ol class="sequence">
+            <li><span class="seq-title">Terraform</span><span class="seq-note">Creates infrastructure, identities, networking, and configuration.</span></li>
+            <li><span class="seq-title">Build and convert</span><span class="seq-note">Pins dependencies and converts each service image once.</span></li>
+            <li><span class="seq-title">Deploy services</span><span class="seq-note">Uses disk-image IDs, then records healthy endpoints.</span></li>
+          </ol>
+          <p>Only the heavy runtime dependency image uses ACR native-v2 conversion and runtime-group <code>AcrPull</code>. Gateway and MCP services convert a public Python digest directly. No registry token or admin credential exists. Prepared group-scoped images are reused.</p>
+          <p>The dependency base pins official Hermes 0.22.6 and contains LibreOffice, compiled .NET helpers, Node packages, and sealed-environment dependencies. Application source is not baked into that image. Thin-service requirements come from frozen locks; approved-feed wheels are downloaded during preparation and installed offline into a lock-addressed environment. A later source change reuses it without pip or image build.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="adr/0021-deployment-time-sandbox-image-authentication.md">Conversion identity decision</a> · <a href="../scripts/sandbox_services.py">Conversion implementation</a> · <a href="../DEPLOYMENT.md">Commands and owner preflight</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-suspend">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Idle work needs no continuously running receiver.</span><span class="card-sub">Memory suspend preserves processes; source updates preserve compute identity.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <div class="table-scroll"><table class="architecture-table"><thead><tr><th>Service</th><th>Idle behavior</th><th>Update and recovery</th></tr></thead><tbody>
+            <tr><td>Gateway</td><td>Memory suspend after 300 s</td><td>Source switch preserves URL; journal restores from <code>gateway-state</code></td></tr>
+            <tr><td>Runtime</td><td>300-second Memory threshold; active-only self ingress</td><td>Source switch preserves compute; replacement restores native Hermes home</td></tr>
+            <tr><td>Private/public MCP</td><td>Memory suspend after 300 s</td><td>Prepared dependencies and source release; no custom ACR image</td></tr>
+            <tr><td>Generated apps</td><td>Independent five-minute suspend policy</td><td>Participant-authenticated child compute; default expiry 24 hours</td></tr>
+          </tbody></table></div>
+          <p>Before touching runtime compute, gateway maintenance rejects new admissions and checks unfinished work. Actual native task/executor counters protect the runtime source switch. Completed or quarantined receipts can await settlement without repeating effects. A base-image or compute replacement may still change a native URL and require endpoint reconciliation. Superseded services remain tracked until the replacement passes real checks.</p>
+          <p>Native home archives and checked SQLite journal backups use platform-managed Blob volumes. SQLite snapshots and publication locks stay on local disk; only copied, renamed checkpoints reach Blob. Unknown channel effects are retained in the journal and dead-lettered, never reported as delivered. Deleting a Sandbox Group deletes its volumes.</p>
+          <p>Memory suspend is not disaster recovery, and stopped CPU/RAM is not a zero bill: Service Bus, ACR, storage, and monitoring retain independent charges. Managed source polling can delay recovery/schedules; the rejected three-hop design took 161-175 seconds despite 4-13 seconds of model work. Normal chat now starts immediately and uses native Runs directly. Fast reply, broker settlement, and process retention are measured separately.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../scripts/sandbox_services.py">Service lifecycle</a> · <a href="../scripts/sandbox_runtime.py">Runtime lifecycle</a> · <a href="adr/0022-memory-suspend-with-native-backups.md">Memory suspend measurements</a> · <a href="../bridge/generated_apps.py">Generated apps</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-observability">
+      <h2 class="chapter-label">Observability</h2>
+      <article class="card" id="card-telemetry">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Correlate application work without exporting its content.</span><span class="card-sub">W3C context crosses the bridge and wrapper; native callbacks expose model and tool execution.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>Application Insights receives metadata-only OpenTelemetry spans. Worker and session attribution connect the gateway request, runtime invocation, model calls, and tools. Prompts, responses, bearer tokens, and tool payloads do not belong in this trace stream.</p>
+          <p>The Foundry external-agent registration links this execution to its monitoring surface. Registration does not move the agent into Foundry hosting or establish evaluation quality.</p>
+          <div class="reveal">
+            <button type="button" class="reveal-toggle" aria-expanded="false">Inspect correlation limits</button>
+            <div class="reveal-body"><p>The Sandbox-origin egress path preserves TraceId but can rewrite ParentId; its intermediate platform span is not available in application telemetry. Correlation is therefore useful without a complete platform-hop tree. The native <code>/v1/responses</code> path also lacks explicit session correlation.</p><p>An interrupted native handoff retains its lease to prevent misattributing later spans. Restart the affected wrapper/native runtime processes before reuse; do not fabricate a parent span or silently clear the fence.</p></div>
+          </div>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../bridge/telemetry.py">Telemetry policy</a> · <a href="../bridge/hermes_telemetry.py">Native handoff</a> · <a href="../scripts/register_foundry_external_agent.py">Foundry registration</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-hardening">
+      <h2 class="chapter-label">Production hardening</h2>
+      <article class="card" id="card-target">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Production adds private endpoints and an enterprise hub.</span><span class="card-sub">Network changes limit reachability; they do not replace identity checks.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>This is a target design, not the deployed state. Service Bus moves to Premium, and Service Bus and Foundry get private endpoints in the workload VNet. A peered enterprise hub provides DNS, firewall, controlled egress, and routes to existing private MCP services and backend APIs.</p>
+          <figure class="architecture-figure" data-diagram id="diagram-infrastructure">
+            <div class="diagram-toolbar"><span class="diagram-label">02 / Production target network</span><button class="diagram-focus" type="button">Focus diagram</button></div>
+            <div class="diagram-scroll">
+              <svg class="architecture-svg" viewBox="0 0 1100 890" role="group" aria-labelledby="infra-title infra-desc">
+                <title id="infra-title">A workload VNet connects compute, private endpoints, and three types of tools</title>
+                <desc id="infra-desc">Gateway and agent runtime attach to a central workload VNet. Service Bus Premium and Foundry connect through private endpoints. A peered hub reaches Microsoft-hosted tools over public HTTPS and existing private MCP services. An optional Custom MCP adapter has private ingress and reaches backend APIs through the workload VNet, peering, and enterprise hub. This is a target design, not a deployment change.</desc>
+                <defs><marker id="infra-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs>
+                <rect class="zone" x="20" y="175" width="755" height="500" rx="18"/>
+                <text class="zone-label" x="48" y="206">WORKLOAD SUBSCRIPTION / SPOKE</text>
+                <rect class="zone zone-inner" x="40" y="370" width="715" height="285" rx="12"/>
+                <rect class="zone" x="505" y="699" width="585" height="155" rx="12"/>
+                <text class="small-label" x="715" y="724">PRIVATE CUSTOMER SERVICES</text>
+                <text class="small-label" x="182" y="724">AZURE MANAGED SERVICES</text>
+
+                <path class="edge" data-from="detail-teams" data-to="detail-agent365" d="M270 70H345" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-agent365" data-to="detail-gateway" d="M470 110V142H34V275H60" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="167" y="137">public HTTPS /api/messages</text>
+                <path class="edge" data-from="detail-gateway" data-to="detail-runtime" d="M290 275H415" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="329" y="260">invoke</text>
+                <path class="edge" data-from="detail-gateway" data-to="detail-vnet" d="M175 320V405" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-runtime" data-to="detail-vnet" d="M560 320V405" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="191" y="355">VNet connection</text>
+                <text class="edge-label" x="576" y="355">VNet connection</text>
+                <path class="edge" data-from="detail-vnet" data-to="detail-servicebus-pe" d="M158 485V545" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-vnet" data-to="detail-foundry-pe" d="M388 485V545" marker-end="url(#infra-arrow)"/>
+                <path class="edge optional-edge" data-from="detail-private-mcp" data-to="detail-vnet" d="M628 545V485" marker-start="url(#infra-arrow)" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-servicebus-pe" data-to="detail-servicebus" d="M158 620V745" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-foundry-pe" data-to="detail-foundry" d="M388 620V745" marker-end="url(#infra-arrow)"/>
+                <path class="edge" data-from="detail-hub" data-to="detail-corporate" d="M868 495V681H628V745" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="642" y="671">backend API via hub</text>
+                <path class="edge" data-from="detail-vnet" data-to="detail-hub" d="M735 445H825" marker-start="url(#infra-arrow)" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="756" y="431">peering</text>
+                <path class="edge" data-from="detail-hub" data-to="detail-microsoft-tools" d="M948 405V330" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="961" y="368">egress</text>
+                <path class="edge" data-from="detail-hub" data-to="detail-existing-mcp" d="M948 495V745" marker-end="url(#infra-arrow)"/>
+                <text class="edge-label" x="964" y="615">private route</text>
+
+                <a class="arch-node" href="#detail-teams" data-detail="detail-teams" aria-label="Teams and Microsoft 365 entry points: details"><rect x="40" y="30" width="230" height="80" rx="10"/><text class="node-title" x="58" y="61">Teams / Microsoft 365</text><text class="node-sub" x="58" y="86">User-facing conversation</text></a>
+                <a class="arch-node" href="#detail-agent365" data-detail="detail-agent365" aria-label="Agent 365 channel delivery: details"><rect x="345" y="30" width="250" height="80" rx="10"/><text class="node-title" x="363" y="61">Agent 365</text><text class="node-sub" x="363" y="86">Agent User + activity delivery</text></a>
+                <a class="arch-node" href="#detail-gateway" data-detail="detail-gateway" aria-label="Gateway Sandbox: details"><rect x="60" y="230" width="230" height="90" rx="10"/><text class="node-title" x="78" y="261">Gateway</text><text class="node-sub" x="78" y="286">ACA Sandbox / public ingress</text><text class="node-meta" x="78" y="306">Memory / native wake</text></a>
+                <a class="arch-node" href="#detail-runtime" data-detail="detail-runtime" aria-label="Agent runtime Sandbox: details"><rect x="415" y="230" width="290" height="90" rx="10"/><text class="node-title" x="433" y="261">Agent runtime</text><text class="node-sub" x="433" y="286">ACA Sandbox / single writer</text><text class="node-meta" x="433" y="306">Suspend and resume</text></a>
+                <a class="arch-node" href="#detail-vnet" data-detail="detail-vnet" aria-label="Workload VNet connectivity: details"><rect x="60" y="405" width="675" height="80" rx="10"/><text class="node-title" x="80" y="438">Customer VNet</text><text class="node-sub" x="80" y="464">Workload connections / private endpoints / routing + DNS</text></a>
+                <a class="arch-node" href="#detail-servicebus-pe" data-detail="detail-servicebus-pe" aria-label="Service Bus private endpoint: details"><rect x="60" y="545" width="195" height="75" rx="10"/><text class="node-title" x="76" y="574">Service Bus PE</text><text class="node-sub" x="76" y="599">Private endpoint</text></a>
+                <a class="arch-node" href="#detail-foundry-pe" data-detail="detail-foundry-pe" aria-label="Foundry private endpoint: details"><rect x="290" y="545" width="195" height="75" rx="10"/><text class="node-title" x="306" y="574">Foundry PE</text><text class="node-sub" x="306" y="599">Private endpoint</text></a>
+                <a class="arch-node optional-node" href="#detail-private-mcp" data-detail="detail-private-mcp" aria-label="Custom MCP adapter: details"><rect x="520" y="545" width="215" height="95" rx="10"/><text class="node-title" x="536" y="574">Custom MCP</text><text class="node-sub" x="536" y="599">ACA Sandbox / Express</text><text class="node-meta" x="536" y="623">Private ingress only</text></a>
+                <a class="arch-node" href="#detail-servicebus" data-detail="detail-servicebus" aria-label="Private Service Bus Premium design: details"><rect x="60" y="745" width="195" height="90" rx="10"/><text class="node-title" x="76" y="776">Service Bus</text><text class="node-sub" x="76" y="800">Premium / per-Worker queue</text><text class="node-meta" x="76" y="822">Private access</text></a>
+                <a class="arch-node" href="#detail-foundry" data-detail="detail-foundry" aria-label="Foundry model API with private access: details"><rect x="290" y="745" width="195" height="90" rx="10"/><text class="node-title" x="306" y="776">Foundry</text><text class="node-sub" x="306" y="800">Model API / Entra identity</text><text class="node-meta" x="306" y="822">Private access</text></a>
+                <a class="arch-node" href="#detail-hub" data-detail="detail-hub" aria-label="Enterprise hub connectivity: details"><rect x="825" y="405" width="245" height="90" rx="10"/><text class="node-title" x="843" y="436">Enterprise hub</text><text class="node-sub" x="843" y="461">Firewall / DNS / private routes</text><text class="node-meta" x="843" y="482">Hub subscription</text></a>
+                <a class="arch-node" href="#detail-microsoft-tools" data-detail="detail-microsoft-tools" aria-label="Microsoft-hosted tools over public HTTPS: details"><rect x="825" y="230" width="245" height="100" rx="10"/><text class="node-title" x="843" y="260">Microsoft tools</text><text class="node-sub" x="843" y="285">Azure DevOps / M365 MCP</text><text class="node-meta" x="843" y="310">Public HTTPS + authorization</text></a>
+                <a class="arch-node" href="#detail-existing-mcp" data-detail="detail-existing-mcp" aria-label="Existing MCP in the customer network: details"><rect x="825" y="745" width="245" height="90" rx="10"/><text class="node-title" x="841" y="775">Existing private MCP</text><text class="node-sub" x="841" y="800">Already in customer network</text><text class="node-meta" x="841" y="822">Reach through private routes</text></a>
+                <a class="arch-node" href="#detail-corporate" data-detail="detail-corporate" aria-label="Backend systems reached by Custom MCP through the enterprise hub: details"><rect x="520" y="745" width="215" height="90" rx="10"/><text class="node-title" x="536" y="776">Backend systems</text><text class="node-sub" x="536" y="800">Customer APIs</text><text class="node-meta" x="536" y="822">Via enterprise hub</text></a>
+              </svg>
+            </div>
+            <figcaption>PE means private endpoint. Custom MCP reaches backend systems through the workload VNet, peering, and enterprise hub before entering the private customer network.</figcaption>
+          </figure>
+          <p>Tools fit three patterns: Microsoft-hosted MCP services on public HTTPS, existing MCP services in the customer network, or a custom MCP adapter deployed with the solution. Identity checks stay the same in every pattern.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <section class="takeaway" id="closing">
+    <p>Keep infrastructure declarative, source releases reproducible, native admissions durable, and every identity and recovery boundary explicit.</p>
+  </section>
+
+  <div class="component-reference" data-popup-reference>
+    <h2 class="chapter-label">Component reference</h2>
+    <details class="component-detail" id="az-agent365" open><summary>Agent 365</summary><div class="component-copy"><p class="detail-status">Entra and Microsoft 365 objects</p><p>Each Worker has an agent blueprint, an Agent Identity, and a licensed Agent User. Scripts create them and register the messaging endpoint as the gateway URL plus <code>/api/messages</code>. Terraform does not manage these objects.</p></div></details>
+    <details class="component-detail" id="az-teams" open><summary>Teams and Microsoft 365</summary><div class="component-copy"><p class="detail-status">User-facing workloads</p><p>Users mention the Agent User in Teams, mail it, or comment in Office documents. Work IQ and Graph calls from the runtime run as the Agent User.</p></div></details>
+    <details class="component-detail" id="az-gateway" open><summary>Gateway Sandbox Group</summary><div class="component-copy"><p class="detail-status">Memory suspend after 300 s</p><p>The bridge validates Activity Protocol authentication, commits private payloads before ACK, and resumes channel work from native callbacks. Operator jobs return durable admission instead of waiting under an HTTP ingress timeout. Its managed identity owns only its connection and generated-app lifecycle; it cannot provision runtime compute. The journal is checkpointed to the <code>gateway-state</code> Blob volume.</p></div></details>
+    <details class="component-detail" id="az-runtime" open><summary>Agent runtime Sandbox Group</summary><div class="component-copy"><p class="detail-status">Hermes 0.22.6 / 300-second Memory threshold</p><p>A dependency image and separately hashed source release host one native writer. Model requests use native Runs over authenticated OnDemand HTTPS; there is no runtime queue consumer or custom transport journal. Native home archives use the <code>hermes-backups</code> Blob volume. Actual native task/executor counters protect updates. Its VNet connection reaches private MCP; source changes need not replace compute.</p></div></details>
+    <details class="component-detail" id="az-apps" open><summary>Generated apps Sandbox Group</summary><div class="component-copy"><p class="detail-status">One Sandbox per app</p><p>The gateway starts each Worker-created app in its own Sandbox with Entra-protected ports. Apps suspend after 5 idle minutes and expire after a lifetime of 24 hours by default (15 minutes to 7 days).</p></div></details>
+    <details class="component-detail" id="az-public-mcp" open><summary>Public shipments MCP</summary><div class="component-copy"><p class="detail-status">Public HTTPS / Memory after 300 s</p><p>A public Python base plus verified source release serves demo shipments. Entra enforces tenant, issuer, audience, and approved shipment scope/application role. The native port is OnDemand; no registry grant is needed.</p></div></details>
+    <details class="component-detail" id="az-private-mcp" open><summary>Private incidents MCP</summary><div class="component-copy"><p class="detail-status">Private ingress / Memory after 300 s</p><p>The group remains irreversibly linked to the Express environment. Application authorization pins the expected Worker Agent Identity and incident role. Its public Python base and source release need no ACR image.</p></div></details>
+    <details class="component-detail" id="az-servicebus" open><summary>Service Bus and native receivers</summary><div class="component-copy"><p class="detail-status">Standard / Entra / gateway-owned connection</p><p>Each Worker has a one-day recovery queue plus its enabled scheduling queue with a fourteen-day TTL. Locks are five minutes; duplicate detection is one hour. Native receivers wake only the gateway. The gateway renews/completes through its creator-bound connection and does not repeat completed fast work. Private payloads remain in its checked journal.</p></div></details>
+    <details class="component-detail" id="az-foundry" open><summary>Foundry</summary><div class="component-copy"><p class="detail-status">AIServices S0, local auth disabled</p><p>Project <code>autopilots-project</code> with deployment <code>gpt-6-1-sol</code> (model <code>gpt-6.1-sol</code>, GlobalStandard, capacity 100) in Sweden Central. The runtime managed identity has Cognitive Services OpenAI User. Foundry also holds the external-agent registration and an Application Insights connection.</p></div></details>
+    <details class="component-detail" id="az-acr" open><summary>Container Registry</summary><div class="component-copy"><p class="detail-status">Runtime dependency base only</p><p>Basic registry with admin disabled. It holds the pinned Hermes dependency image, compiled Office tools, and required runtime packages. Only runtime conversion needs AcrPull. Gateway and MCP source changes use public-image releases and never need a custom image build.</p></div></details>
+    <details class="component-detail" id="az-monitor" open><summary>Azure Monitor</summary><div class="component-copy"><p class="detail-status">Log Analytics + Application Insights</p><p>Both have local authentication disabled. Gateway and runtime managed identities publish metadata-only OpenTelemetry spans with Monitoring Metrics Publisher.</p></div></details>
+    <details class="component-detail" id="az-vnet" open><summary>Workload VNet</summary><div class="component-copy"><p class="detail-status">10.42.0.0/16, North Europe</p><p>Holds subnet <code>snet-private-endpoints</code> (10.42.2.0/24) with the private endpoint <code>pe-apmcp-*</code> for the Express environment.</p></div></details>
+    <details class="component-detail" id="az-express" open><summary>Express managed environment</summary><div class="component-copy"><p class="detail-status">Public network access disabled</p><p>Environment <code>apmcp-*</code> in Sweden Central supplies private ingress for the linked private-MCP Sandbox Group.</p></div></details>
+    <details class="component-detail" id="az-vnet-sandbox" open><summary>Sandbox VNet</summary><div class="component-copy"><p class="detail-status">10.44.0.0/16, Sweden Central</p><p>Subnet <code>snet-sandbox</code> (10.44.0.0/24) is delegated to <code>Microsoft.App/environments</code>. Runtime and gateway Groups attach through VNet connections. Peered in both directions with the workload VNet.</p></div></details>
+    <details class="component-detail" id="az-dns" open><summary>Private DNS zone</summary><div class="component-copy"><p class="detail-status">privatelink.swedencentral.azurecontainerapps.io</p><p>Resolves the private MCP hostname to the private endpoint. Linked to both VNets.</p></div></details>
+    <details class="component-detail" id="detail-teams" open><summary>Teams and Microsoft 365 entry points</summary><div class="component-copy"><p class="detail-status">Reference implementation</p><p>Personal messages and explicit Agent User mentions are supported entry points. Delivered replies, selected reactions, Mail notifications, and Office comment events have workload-specific handling.</p><p>Shared groups are a shared audience. Private per-person delivery and human on-behalf-of identity are not implemented.</p></div></details>
+    <details class="component-detail" id="detail-agent365" open><summary>Agent 365 channel and identity binding</summary><div class="component-copy"><p class="detail-status">Channel identity</p><p>Each Worker has an Agent Identity and Agent User. Agent 365 binds its endpoint and permissions, then delivers Microsoft 365 activities to <code>/api/messages</code>. The Agents SDK authenticates incoming requests.</p></div></details>
+    <details class="component-detail" id="detail-gateway" open><summary>Gateway Sandbox</summary><div class="component-copy"><p class="detail-status">Memory suspend / immediate native Runs</p><p>Authenticated admission and a recovery reference are committed before ACK. Immediate work and native recovery share one processor; a late receipt does not run the model again. Private payloads, native admission and conversation bindings have checked Blob recovery. Model inference and tool calls remain in the runtime.</p></div></details>
+    <details class="component-detail" id="detail-runtime" open><summary>Agent runtime</summary><div class="component-copy"><p class="detail-status">ACA Sandbox / native Runs</p><p>Deployment owns compute. The gateway records exact native admission and frozen transcript identity; the runtime owns actual execution. Active-only keepalive protects work. Memory resume preserves processes; source releases preserve the Sandbox ID and URL. Native home archives recover runtime state, while the independent gateway journal recovers work admission.</p></div></details>
+    <details class="component-detail" id="detail-vnet" open><summary>Customer VNet</summary><div class="component-copy"><p class="detail-status">Workload connectivity</p><p>Gateway and runtime attach here. Private endpoints connect managed services; private MCP ingress joins the same network boundary. Peering reaches the enterprise hub. Routes and DNS provide reachability; identity still controls access.</p></div></details>
+    <details class="component-detail" id="detail-servicebus-pe" open><summary>Service Bus private endpoint</summary><div class="component-copy"><p class="detail-status">Target design / receiver routing must be verified</p><p>Private endpoint and DNS can connect workload clients to Premium. A managed receiver runs outside the actor, so actor VNet attachment alone does not establish receiver reachability. Verify the supported native connector network path before disabling public broker access. Entra authorization remains required.</p></div></details>
+    <details class="component-detail" id="detail-foundry-pe" open><summary>Foundry private endpoint</summary><div class="component-copy"><p class="detail-status">Target design</p><p>The Foundry private endpoint connects model access to the workload VNet. Private DNS resolves the model endpoint to its private address; the runtime still authenticates with its managed identity.</p></div></details>
+    <details class="component-detail" id="detail-private-mcp" open><summary>Custom MCP</summary><div class="component-copy"><p class="detail-status">Optional adapter</p><p>Add an ACA-hosted adapter when a backend lacks MCP. It exposes a private MCP interface and reaches backend APIs through the workload VNet and enterprise hub. Use a supported private-ingress hosting configuration.</p></div></details>
+    <details class="component-detail" id="detail-servicebus" open><summary>Service Bus queues and dead-letter handling</summary><div class="component-copy"><p class="detail-status">Target: private broker plus verified receiver route</p><p>Keep recovery references separate from scheduled metadata. Native receivers own PeekLock; the gateway renews and settles through its own connection. A private endpoint is not proof of receiver reachability. Normal chat does not wait for polling. Unknown effects stop, and DLQ is visible failure state, never successful delivery.</p></div></details>
+    <details class="component-detail" id="detail-foundry" open><summary>Foundry model inference</summary><div class="component-copy"><p class="detail-status">Target design: private endpoint</p><p>The agent runtime calls Foundry through the private endpoint. Runtime managed identity and RBAC authorize inference; private routing and DNS provide reachability. The model service remains outside the workload subnet.</p></div></details>
+    <details class="component-detail" id="detail-hub" open><summary>Enterprise hub</summary><div class="component-copy"><p class="detail-status">Shared network services</p><p>VNet peering connects the workload spoke to hub routing, DNS, and firewall services. The hub provides controlled public egress and private routes to existing customer services, including MCP endpoints.</p></div></details>
+    <details class="component-detail" id="detail-microsoft-tools" open><summary>Microsoft-hosted MCP tools</summary><div class="component-copy"><p class="detail-status">Public HTTPS</p><p>Use approved Microsoft-hosted tools, such as Azure DevOps and Microsoft 365 MCP integrations. Configure permissions for each service. Microsoft 365 operations use the approved Agent User flow; other services require their own supported connection.</p></div></details>
+    <details class="component-detail" id="detail-existing-mcp" open><summary>Existing private MCP</summary><div class="component-copy"><p class="detail-status">Customer-provided service</p><p>Connect to an MCP server already running in the customer network through private routing and DNS. Reuse its approved authentication and permissions; no new MCP host is needed in this solution.</p></div></details>
+    <details class="component-detail" id="detail-corporate" open><summary>Backend systems</summary><div class="component-copy"><p class="detail-status">Customer APIs</p><p>Custom MCP reaches these APIs through the workload VNet, peering, and enterprise hub into the private customer network. Backends keep their existing interfaces and permissions; they do not need to implement MCP.</p></div></details>
+  </div>
+
+  <footer class="doc-footer">
+    <a href="../DEPLOYMENT.md">Deployment</a>
+    <a href="adr/">Architecture decisions</a>
+    <a href="../SPEC.md">Implementation contract</a>
+  </footer>
+
+</div>
+
+</body>
+</html>

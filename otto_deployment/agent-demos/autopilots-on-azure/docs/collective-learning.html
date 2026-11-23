@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en" data-default-accent="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collective learning</title>
+<meta name="description" content="How an Autopilots Worker learns locally and shares reviewed role skills through a Role Release.">
+<meta name="doc-id" content="autopilots-collective-learning">
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name), root.getAttribute("data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen only: every PDF and printout uses the light palette. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+<link rel="stylesheet" href="assets/article.css">
+<link rel="stylesheet" href="assets/diagrams.css">
+<script src="assets/article.js" defer></script>
+<script src="assets/diagrams.js" defer></script>
+</head>
+
+<body>
+
+<div class="controls" role="group" aria-label="Article controls">
+  <button type="button" class="ctrl" data-action="expand-all">Expand all</button>
+  <button type="button" class="ctrl" data-action="collapse-all">Collapse all</button>
+  <button type="button" class="ctrl" data-action="print" aria-label="Save the current view as PDF or print it">PDF</button>
+  <button type="button" class="ctrl" data-action="toggle-theme">Dark</button>
+  <button type="button" class="ctrl" data-action="toggle-accent">Accent: Blue</button>
+</div>
+
+<div class="doc">
+
+  <header class="doc-header" id="opening">
+    <p class="eyebrow">Autopilots on Azure / 2 of 3</p>
+    <h1>Collective learning</h1>
+    <p class="subtitle">Hermes supplies memory, history, skills, and a skill ledger. This project adds owner review, export approval, and a reviewed release path.</p>
+  </header>
+
+  <nav class="doc-nav" aria-label="Architecture documents">
+    <a href="architecture.html">Architecture</a>
+    <a href="collective-learning.html" aria-current="page">Collective learning</a>
+    <a href="azure-implementation.html">Azure implementation</a>
+  </nav>
+
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-label">Contents</p>
+    <ol>
+      <li><a href="#ch-layers">Private and shared state</a></li>
+      <li><a href="#ch-acceptance">Local learning and review</a></li>
+      <li><a href="#ch-sharing">Approval and release</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section class="chapter" id="ch-layers">
+      <h2 class="chapter-label">Private and shared state</h2>
+      <article class="card card--lead" id="card-state" data-open>
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="true"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Learning changes the Worker's context, not model weights.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <div class="summary-grid">
+            <div class="summary-item"><span class="summary-label">Private memory</span><code>USER.md</code> and <code>MEMORY.md</code> retain compact preferences and durable working facts.</div>
+            <div class="summary-item"><span class="summary-label">Private skills</span><code>skills/private/</code> stores project-, customer-, or assignment-specific playbooks.</div>
+            <div class="summary-item"><span class="summary-label">Role skills</span><code>skills/role/</code> starts from a reviewed Role Release and can receive governed local patches.</div>
+            <div class="summary-item"><span class="summary-label">Candidates</span><code>skills/candidates/</code> holds generalized capabilities proposed locally for later review.</div>
+          </div>
+          <p>Raw Work History stays private. Only role and candidate changes whose current content the Worker owner chose to share enter a Learning Packet. Generalization means removing private facts, not just moving the same text into another directory.</p>
+          <p class="scope-note">Hover or focus a component to inspect it. Click, tap, or press Enter to pin its explanation; Escape dismisses it. Use <strong>Focus diagram</strong> for a larger view. The PDF lists every explanation in a component reference after the takeaway.</p>
+          <figure class="architecture-figure" data-diagram id="diagram-learning">
+            <div class="diagram-toolbar"><span class="diagram-label">01 / Learning lifecycle</span><button class="diagram-focus" type="button">Focus diagram</button></div>
+            <div class="diagram-scroll">
+              <svg class="architecture-svg" viewBox="0 0 1100 680" role="group" aria-labelledby="learning-title learning-desc">
+                <title id="learning-title">A Worker learns natively and shares owner-approved role skills through a Role Release</title>
+                <desc id="learning-desc">Work turns and the Dream write memory and skills through native Hermes tools into the Worker home, and the native skill ledger records every skill change. The Worker owner reviews the changes in a private Teams digest and can undo, keep, discard, or share them. Shared role and candidate skills become a digest-bound Learning Packet with their ledger chain. An Ed25519 approval allows export to collective review, which opens a promotion pull request. A human merge produces a Role Release, and a forward-only refresh installs it while keeping private state.</desc>
+                <defs><marker id="lc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs>
+                <rect class="zone" x="15" y="20" width="640" height="640" rx="16"/><text class="zone-label" x="35" y="52">WORKER / PRIVATE HOME</text>
+                <rect class="zone" x="675" y="20" width="410" height="640" rx="16"/><text class="zone-label" x="695" y="52">CENTRAL / GIT ROLE BLUEPRINT</text>
+                <path class="edge" data-from="lc-turn" data-to="lc-native" d="M210 137H245" marker-end="url(#lc-arrow)"/>
+                <path class="edge" data-from="lc-dream" data-to="lc-native" d="M210 347H228V165H245" marker-end="url(#lc-arrow)"/>
+                <path class="edge" data-from="lc-native" data-to="lc-home" d="M335 185V300" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="345" y="248">writes + ledger entry</text>
+                <path class="edge" data-from="lc-native" data-to="lc-owner" d="M425 137H460" marker-end="url(#lc-arrow)"/>
+                <path class="edge" data-from="lc-owner" data-to="lc-packet" d="M550 185V300" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="560" y="248">owner shares</text>
+                <path class="edge" data-from="lc-packet" data-to="lc-approval" d="M550 395V450" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="560" y="428">operator signs</text>
+                <path class="edge" data-from="lc-approval" data-to="lc-review" d="M640 497H665V137H690" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="678" y="248">approved export</text>
+                <path class="edge" data-from="lc-review" data-to="lc-pr" d="M880 185V300" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="890" y="248">draft pull request</text>
+                <path class="edge" data-from="lc-pr" data-to="lc-release" d="M880 395V450" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="890" y="428">human merge</text>
+                <path class="edge" data-from="lc-release" data-to="lc-refresh" d="M880 545V585H335V545" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="470" y="577">select release</text>
+                <path class="edge" data-from="lc-refresh" data-to="lc-home" d="M335 450V395" marker-end="url(#lc-arrow)"/>
+                <text class="edge-label" x="345" y="428">replace role skills</text>
+                <a class="arch-node" href="#lc-turn" data-detail="lc-turn" aria-label="Work turn: details"><rect x="30" y="90" width="180" height="95" rx="10"/><text class="node-title" x="46" y="122">Work turn</text><text class="node-sub" x="46" y="148">Ordinary or /learn</text><text class="node-meta" x="46" y="170">+ background review</text></a>
+                <a class="arch-node" href="#lc-native" data-detail="lc-native" aria-label="Native learning: details"><rect x="245" y="90" width="180" height="95" rx="10"/><text class="node-title" x="261" y="122">Native learning</text><text class="node-sub" x="261" y="148">memory + skill_manage</text><text class="node-meta" x="261" y="170">Skill ledger records</text></a>
+                <a class="arch-node" href="#lc-owner" data-detail="lc-owner" aria-label="Owner review: details"><rect x="460" y="90" width="180" height="95" rx="10"/><text class="node-title" x="476" y="122">Owner review</text><text class="node-sub" x="476" y="148">Private Teams digest</text><text class="node-meta" x="476" y="170">Undo, approve, share</text></a>
+                <a class="arch-node" href="#lc-dream" data-detail="lc-dream" aria-label="Dream: details"><rect x="30" y="300" width="180" height="95" rx="10"/><text class="node-title" x="46" y="332">Dream</text><text class="node-sub" x="46" y="358">system.dream occurrence</text><text class="node-meta" x="46" y="380">Fenced, resumable</text></a>
+                <a class="arch-node" href="#lc-home" data-detail="lc-home" aria-label="Worker home: details"><rect x="245" y="300" width="180" height="95" rx="10"/><text class="node-title" x="261" y="332">Worker home</text><text class="node-sub" x="261" y="358">Sandbox disk + backups</text><text class="node-meta" x="261" y="380">Private stays here</text></a>
+                <a class="arch-node" href="#lc-packet" data-detail="lc-packet" aria-label="Learning Packet: details"><rect x="460" y="300" width="180" height="95" rx="10"/><text class="node-title" x="476" y="332">Learning Packet</text><text class="node-sub" x="476" y="358">Shared skills + ledger</text><text class="node-meta" x="476" y="380">Digest-bound</text></a>
+                <a class="arch-node" href="#lc-approval" data-detail="lc-approval" aria-label="Signed approval: details"><rect x="460" y="450" width="180" height="95" rx="10"/><text class="node-title" x="476" y="482">Signed approval</text><text class="node-sub" x="476" y="508">Ed25519 receipt</text><text class="node-meta" x="476" y="530">Export or reject</text></a>
+                <a class="arch-node" href="#lc-refresh" data-detail="lc-refresh" aria-label="Worker refresh: details"><rect x="245" y="450" width="180" height="95" rx="10"/><text class="node-title" x="261" y="482">Worker refresh</text><text class="node-sub" x="261" y="508">Forward-only</text><text class="node-meta" x="261" y="530">Private state kept</text></a>
+                <a class="arch-node" href="#lc-review" data-detail="lc-review" aria-label="Collective review: details"><rect x="690" y="90" width="380" height="95" rx="10"/><text class="node-title" x="706" y="122">Collective review</text><text class="node-sub" x="706" y="148">Verify packets, compare Workers, judge</text><text class="node-meta" x="706" y="170">Role skills only</text></a>
+                <a class="arch-node" href="#lc-pr" data-detail="lc-pr" aria-label="Promotion pull request: details"><rect x="690" y="300" width="380" height="95" rx="10"/><text class="node-title" x="706" y="332">Promotion pull request</text><text class="node-sub" x="706" y="358">Privacy, role, evidence, quality gates</text><text class="node-meta" x="706" y="380">Human merges; evaluation informs</text></a>
+                <a class="arch-node" href="#lc-release" data-detail="lc-release" aria-label="Role Release: details"><rect x="690" y="450" width="380" height="95" rx="10"/><text class="node-title" x="706" y="482">Role Release</text><text class="node-sub" x="706" y="508">Semantic version, pinned commit</text><text class="node-meta" x="706" y="530">Next refresh source</text></a>
+                <text class="svg-note" x="35" y="635">Private memory, private skills, Work History, and documents never leave the Worker.</text>
+              </svg>
+            </div>
+            <figcaption>Local learning, the owner's Share choice, and export approval are separate decisions. Nothing crosses into the central zone without a signed approval.</figcaption>
+          </figure>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../blueprints/junior-project-manager/SOUL.md">Classification policy</a> · <a href="../runtimes/hermes/native_learning.py">Owner review and private-session guard</a> · <a href="../runtimes/hermes/collective_learning.py">Learning Packet 3.0</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-context">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Load compact context; retrieve deeper history when needed.</span><span class="card-sub">Native Hermes supplies the mechanisms. The Role Blueprint supplies their policy.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ul>
+            <li><strong>Fresh session:</strong> active <code>SOUL.md</code> and compact memory provide starting context.</li>
+            <li><strong>Relevant task:</strong> skill names and descriptions allow discovery; full instructions load when selected.</li>
+            <li><strong>Recall or Dream:</strong> session search retrieves relevant Work History instead of injecting the entire database.</li>
+          </ul>
+          <p>Memory files and private playbooks are Worker-wide. Session keys identify the caller, but native group transcripts are shared and rotate hourly by default. A user-specific key does not create a separate memory store.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../runtimes/hermes/start_hermes.py">Native runtime setup</a> · <a href="../runtimes/hermes/blueprint.py">Home layout</a> · <a href="../SPEC.md">Conversation boundary</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-acceptance">
+      <h2 class="chapter-label">Local learning and review</h2>
+      <article class="card" id="card-foreground">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">A turn can learn without approving its own export.</span><span class="card-sub">Ordinary work, background review, and /learn write through the same native tools.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>Hermes learns natively. An ordinary turn may update memory or skills, and a background review after the turn may add more; memory and skill nudges arrive every ten turns. Hermes' native <code>/learn</code> turns a request into a skill through <code>skill_manage</code>. The native skill ledger records every skill change with its actor, action, before/after hashes, and content.</p>
+          <p>A useful local improvement can remain active in this Worker before any shared release. That local acceptance neither exports private data nor grants permission to publish the skill to other Workers.</p>
+          <p>Attachment and persistence-disabled turns run in a separate native session marked <code>private:</code>. A <code>pre_tool_call</code> hook blocks <code>memory</code>, <code>skill_manage</code>, and file writes into <code>skills/</code> or <code>memories/</code> there, including in the background review fork. Separate native session identity is part of the privacy boundary, not a second shared memory.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../bridge/">Turn routing and learning instructions</a> · <a href="../runtimes/hermes/native_learning.py">Private-session hook</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-dream">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Dream reflects across work, under the same rules.</span><span class="card-sub">A bounded reflection task, not a second autonomous runtime.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ol class="sequence">
+            <li><span class="seq-title">Review</span><span class="seq-note">Inspect outcomes, corrections, skills, and relevant history.</span></li>
+            <li><span class="seq-title">Classify</span><span class="seq-note">Keep private context private; generalize reusable behavior.</span></li>
+            <li><span class="seq-title">Write or skip</span><span class="seq-note">Use native memory and skill tools, or store nothing.</span></li>
+          </ol>
+          <p>The reviewed Dream Role Skill guides reflection. A native Service Bus receiver wakes the suspended gateway for a system occurrence; no gateway timer or receive thread owns the wait. Durable fenced phases recover completed responses; an unknown interrupted model outcome stops rather than triggering a blind replay. Ad-hoc execution does not consume the production occurrence. After a Dream, the Worker owner receives the learning digest.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../blueprints/junior-project-manager/skills/role/dream-reflection/SKILL.md">Dream instructions</a> · <a href="../bridge/scheduled_learning.py">Durable coordinator</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-governance">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">The Worker owner decides what stays and what may be shared.</span><span class="card-sub">A private Teams digest shows native ledger diffs with typed decisions.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ol class="steps">
+            <li><h4>Read the digest</h4><p>After Dreaming, and on <code>/learning</code> or <code>/learned</code> in the owner's personal chat, the gateway sends a private card with recent skill changes and their diffs. Nothing is sent to group chats.</p></li>
+            <li><h4>Undo or approve</h4><p><strong>Undo</strong> uses native rollback. With <code>HERMES_SKILL_WRITE_APPROVAL</code>, skill writes are staged until the owner chooses <strong>Approve</strong> or <strong>Reject</strong>.</p></li>
+            <li><h4>Share, keep, or discard</h4><p>For a Role Skill or Candidate Improvement change, <strong>Share</strong> makes its current content eligible for a packet. <strong>Keep</strong> copies it to the private <code>&lt;skill&gt;-playbook</code> and restores the release baseline; <strong>Discard</strong> restores the baseline.</p></li>
+          </ol>
+          <div class="reveal">
+            <button type="button" class="reveal-toggle" aria-expanded="false">Inspect the decision contract</button>
+            <div class="reveal-body"><p>The owner is <code>worker_owner_id</code>, normally the Agent Identity sponsor. Card actions are encrypted, expiring tokens bound to the owner and conversation. Every decision is an idempotent receipt in <code>learning/receipts/</code>; share choices live in <code>learning/share-choices.json</code>. A later change to a shared skill needs a new Share choice.</p><p>Background review and Dreaming write through the same native tools, so their changes appear in the same digest. A governed change without a complete ledger trace, such as a direct file edit, is shown but stays out of packets.</p></div>
+          </div>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../runtimes/hermes/native_learning.py">Owner decisions and rollback</a> · <a href="../runtimes/hermes/runtime_routes.py">Internal learning routes</a> · <a href="../bridge/learning_cards.py">Teams digest card</a></p></aside>
+        </div>
+      </article>
+    </section>
+    <section class="chapter" id="ch-sharing">
+      <h2 class="chapter-label">Approval and release</h2>
+      <article class="card" id="card-packet">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Package only what the owner shared, with its ledger chain.</span><span class="card-sub">Learning Packet 3.0 carries shared skill files, their native history, and a verifiable identity.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>Packet preparation includes only Role Skill and Candidate Improvement changes whose current content the owner chose to share. Each carries its single <code>SKILL.md</code>, release-baseline hashes, artifact hash, native ledger chain from the release baseline to the current files, share decision, and owner approvals of staged writes. Worker/release attribution and the governed-state hash bind it to this Worker; the digest binds the packet's exact content.</p>
+          <p>Preparation lists every other governed change under <code>excluded</code> with a reason; it stays local. Only one bounded UTF-8 <code>SKILL.md</code> whose frontmatter names its directory is transferable; scripts, references, binary payloads, credentials, memories, sessions, and private playbooks never are.</p>
+          <p>A privacy scan rejects addresses, identifiers, internal URLs, secrets, and absolute paths. Packets carry no agent-proposed test scenarios.</p>
+          <div class="reveal">
+            <button type="button" class="reveal-toggle" aria-expanded="false">Inspect the ledger chain</button>
+            <div class="reveal-body"><p>The native skill ledger records each skill write with its actor, action, before/after hashes, and content. For a shared skill, the packet carries the entries that lead from the Role Release baseline hash to the current file hash. Preparation recomputes file hashes from disk; the ledger explains them rather than vouching for them.</p><p>A change whose chain is incomplete, or whose content changed after the owner's Share choice, is excluded instead of exported.</p></div>
+          </div>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../runtimes/hermes/collective_learning.py">Packet 3.0 preparation</a> · <a href="../tests/test_collective_learning.py">Packet contracts</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-approval">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Approval binds the packet and the current Worker state.</span><span class="card-sub">A later edit makes the prior approval stale.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>The runtime verifies an Ed25519-signed receipt against the packet digest, Worker, release commit, and governed-state hash. A signature over a different or stale packet cannot authorize export. The gateway holds the private key; runtime and review receive public keys only.</p>
+          <div class="summary-grid">
+            <div class="summary-item"><span class="summary-label">Approve export</span>Allows the exact reviewed packet to leave the Worker; it does not approve merging or release.</div>
+            <div class="summary-item"><span class="summary-label">Reject and refresh</span>Records the signed rejection and permits discarding those governed local changes during the controlled refresh.</div>
+          </div>
+          <p>An unreviewed packet must not be treated as approved simply to unblock a refresh.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../runtimes/hermes/collective_learning.py">Receipt verification and refresh guard</a> · <a href="../DEMO.md">Operator approval flow</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-evaluation">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Only independent cases can test the claimed improvement.</span><span class="card-sub">Run baseline and candidate on the same cases and report the scope honestly.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <p>Packets carry no agent-proposed scenarios: otherwise the author can describe a skill and the easiest test for that same description. An independently authored suite is mandatory; owner-authored holdout cases are the intended judge.</p>
+          <p>The evaluation script invokes real Hermes in isolated baseline and candidate profiles with identical non-skill state and model settings, and records case outcomes and usage. Missing usage is an error, not zero cost. Results need the case set, model/settings, baseline, candidate, and packet binding to be interpretable.</p>
+          <div class="reveal">
+            <button type="button" class="reveal-toggle" aria-expanded="false">Inspect what this evaluator measures</button>
+            <div class="reveal-body"><p>The current runner injects selected skill text into the prompt and asserts response text with <code>contains</code>, <code>not_contains</code>, or <code>equals</code>. Tools, hooks, plugins, MCP, and background learning are disabled. It does not measure native skill discovery, live MCP workflows, tool side effects, repeated-trial variance, or general task success. Neither a signature nor a higher pass rate broadens the tested scope.</p></div>
+          </div>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../scripts/evaluate_learning.py">Evaluation runner</a> · <a href="../tests/test_evaluate_learning.py">Evaluation contracts</a></p></aside>
+        </div>
+      </article>
+      <article class="card" id="card-refresh">
+        <h3 class="card-head"><button type="button" class="card-toggle" aria-expanded="false"><span class="card-num" aria-hidden="true"></span><span class="card-titles"><span class="card-title">Share through a Role Release, not by copying another Worker's home.</span><span class="card-sub">Preserve private continuity while replacing governed behavior.</span></span><span class="card-mark" aria-hidden="true"></span></button></h3>
+        <div class="card-body">
+          <ol class="sequence">
+            <li><span class="seq-title">Review packet</span><span class="seq-note">Check privacy, evidence, skill quality, and role alignment.</span></li>
+            <li><span class="seq-title">Publish release</span><span class="seq-note">Pin the reviewed Role Blueprint to an immutable commit.</span></li>
+            <li><span class="seq-title">Refresh Worker</span><span class="seq-note">Resolve local governed changes, then install the selected release.</span></li>
+          </ol>
+          <p>A forward-only refresh preserves private memories, private playbooks, and Work History. It replaces Role Skills and archives the prior release's candidates and learning decisions. It does not copy another Worker's private home or silently merge unreviewed local edits.</p>
+          <aside class="callout callout--source"><p class="callout-label">Source</p><p><a href="../../.github/workflows/">Promotion review workflows</a> · <a href="../runtimes/hermes/collective_learning.py">Refresh guard</a> · <a href="../runtimes/hermes/blueprint.py">Release installation</a></p></aside>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <section class="takeaway" id="closing">
+    <p>Learn natively, export only what the owner shared and a person approved, and share behavior through a reviewed Role Release.</p>
+  </section>
+
+  <div class="component-reference" data-popup-reference>
+    <h2 class="chapter-label">Component reference</h2>
+    <details class="component-detail" id="lc-turn" open><summary>Work turn</summary><div class="component-copy"><p class="detail-status">Ordinary or /learn</p><p>Native memory and skill tools can change the Worker home during ordinary work, and a background review after the turn may add more. Hermes' native <code>/learn</code> turns a request into a skill through <code>skill_manage</code>. Attachment and persistence-disabled turns run in a <code>private:</code> session where durable memory and skill writes are blocked.</p></div></details>
+    <details class="component-detail" id="lc-dream" open><summary>Dream</summary><div class="component-copy"><p class="detail-status">Scheduled reflection</p><p>A system schedule delivers <code>system.dream</code> through Service Bus and the gateway. The reviewed Dream Role Skill reviews recent work, classifies observations, and writes through native tools or stores nothing. Durable fenced phases recover completed responses; an unknown interrupted outcome stops for inspection. The owner receives the learning digest afterwards.</p></div></details>
+    <details class="component-detail" id="lc-native" open><summary>Native learning</summary><div class="component-copy"><p class="detail-status">Hermes-native</p><p>Memory and <code>skill_manage</code> writes go directly to the Worker home; memory and skill nudges arrive every ten turns. The native skill ledger records every skill change with its actor, action, before/after hashes, and content. With <code>HERMES_SKILL_WRITE_APPROVAL</code>, skill writes are staged until the owner approves them.</p></div></details>
+    <details class="component-detail" id="lc-home" open><summary>Worker home</summary><div class="component-copy"><p class="detail-status">Sandbox disk with native backups</p><p><code>/data/hermes</code> holds <code>USER.md</code>, <code>MEMORY.md</code>, <code>skills/private/</code>, <code>skills/role/</code>, <code>skills/candidates/</code>, the skill ledger, <code>learning/receipts/</code>, sessions, and schedules. Native backups on a Blob volume carry it into a replacement runtime. Private layers never enter a Learning Packet.</p></div></details>
+    <details class="component-detail" id="lc-owner" open><summary>Owner review</summary><div class="component-copy"><p class="detail-status">Private Teams digest</p><p>Only the Worker owner receives it, after Dreaming or on <code>/learning</code>. <em>Undo</em> uses native rollback; staged writes take <em>Approve</em> or <em>Reject</em>. Role and candidate changes take <em>Share</em>, <em>Keep</em> (private playbook, baseline restored), or <em>Discard</em> (baseline restored). Actions are expiring owner-bound tokens with idempotent receipts.</p></div></details>
+    <details class="component-detail" id="lc-packet" open><summary>Learning Packet 3.0</summary><div class="component-copy"><p class="detail-status">Digest-bound export candidate</p><p>Contains only owner-shared Role Skill and Candidate Improvement changes: single <code>SKILL.md</code> files, release-baseline hashes, artifact hash, native ledger chain, share decision, and staged-write approvals. Hashes are recomputed from disk; every other change is listed as excluded with a reason. A privacy scan covers the content.</p></div></details>
+    <details class="component-detail" id="lc-approval" open><summary>Signed approval</summary><div class="component-copy"><p class="detail-status">Ed25519 receipt</p><p>The runtime verifies the signature against the packet digest, Worker, release commit, and governed-state hash. <em>Approve export</em> lets the exact packet leave; <em>reject and refresh</em> permits discarding those local changes. The gateway holds the private key.</p></div></details>
+    <details class="component-detail" id="lc-review" open><summary>Collective review</summary><div class="component-copy"><p class="detail-status">Central workflow</p><p>Verifies packet digests and receipts, compares packets from several Workers, and judges which role skills generalize. Private skills and raw history are not inputs.</p></div></details>
+    <details class="component-detail" id="lc-pr" open><summary>Promotion pull request</summary><div class="component-copy"><p class="detail-status">Draft pull request with agentic gates</p><p>GitHub Agentic Workflows triage the change and review privacy, role alignment, evidence, and skill quality. Evaluation results inform the reviewer; a human merges.</p></div></details>
+    <details class="component-detail" id="lc-release" open><summary>Role Release</summary><div class="component-copy"><p class="detail-status">Pinned Git commit</p><p>A semantic version pinned to an immutable commit of the Role Blueprint. It becomes the baseline for later Learning Packets.</p></div></details>
+    <details class="component-detail" id="lc-refresh" open><summary>Worker refresh</summary><div class="component-copy"><p class="detail-status">Forward-only</p><p>Requires local governed changes to be exported or rejected first. Replaces role skills, archives prior candidates and learning decisions, and keeps private memory, private skills, and Work History.</p></div></details>
+  </div>
+
+  <footer class="doc-footer">
+    <a href="../SPEC.md">Implementation contract</a>
+    <a href="../blueprints/junior-project-manager/">Role Blueprint</a>
+    <a href="../DEMO.md">Demo prompts</a>
+  </footer>
+
+</div>
+
+</body>
+</html>

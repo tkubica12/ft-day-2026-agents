@@ -1,0 +1,345 @@
+variable "autopilot_name" {
+  type    = string
+  default = "hermes"
+}
+
+variable "deployer_principal_id" {
+  type        = string
+  description = "Stable object ID of the deployment principal. Changing the operator login must not change existing grants."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.deployer_principal_id))
+    error_message = "deployer_principal_id must be the existing deployment principal's object ID."
+  }
+}
+
+variable "agent_runtime" {
+  type    = string
+  default = "hermes"
+
+  validation {
+    condition     = var.agent_runtime == "hermes"
+    error_message = "This project hosts Hermes Workers only."
+  }
+}
+
+variable "hermes_role_blueprint" {
+  type    = string
+  default = ""
+}
+
+variable "hermes_role_blueprint_source" {
+  type    = string
+  default = ""
+}
+
+variable "hermes_role_blueprint_path" {
+  type    = string
+  default = ""
+}
+
+variable "hermes_role_release" {
+  type    = string
+  default = ""
+}
+
+variable "hermes_role_release_commit" {
+  type    = string
+  default = ""
+
+  validation {
+    condition     = var.hermes_role_release_commit == "" || can(regex("^[0-9a-fA-F]{40}$", var.hermes_role_release_commit))
+    error_message = "hermes_role_release_commit must be empty or a full 40-character Git commit SHA."
+  }
+}
+
+variable "worker_assignment_scope" {
+  type    = string
+  default = ""
+}
+
+variable "worker_assignment_profile" {
+  description = "Optional assignment profile that selects the private tool service and runtime governance flags."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "budget-season"], var.worker_assignment_profile)
+    error_message = "worker_assignment_profile must be empty or budget-season."
+  }
+}
+
+variable "operator_rehearsal_personas" {
+  description = "Allow operator-key /invoke rehearsals to speak as the assignment's allowlisted demo accounts. Keep false outside rehearsals."
+  type        = bool
+  default     = false
+}
+
+variable "worker_owner_id" {
+  description = "Entra object ID of the Worker owner (Agent Identity sponsor) who receives the private learning digest."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.worker_owner_id == "" || can(regex("^[0-9a-fA-F-]{36}$", var.worker_owner_id))
+    error_message = "worker_owner_id must be empty or an Entra object ID."
+  }
+}
+
+variable "user_scheduling_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "document_retry_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "user_scheduling_max_concurrent_calls" {
+  type    = number
+  default = 1
+
+  validation {
+    condition     = var.user_scheduling_max_concurrent_calls == 1
+    error_message = "A12 currently requires one scheduled call at a time per Worker."
+  }
+}
+
+variable "user_scheduling_max_delivery_count" {
+  type    = number
+  default = 5
+
+  validation {
+    condition     = var.user_scheduling_max_delivery_count >= 1 && var.user_scheduling_max_delivery_count <= 20
+    error_message = "user_scheduling_max_delivery_count must be between 1 and 20."
+  }
+}
+
+variable "user_scheduling_lock_renewal_seconds" {
+  type    = number
+  default = 1800
+}
+
+variable "servicebus_dream_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "servicebus_dream_cron_expression" {
+  type    = string
+  default = "0 2 * * *"
+
+  validation {
+    condition     = length(split(" ", trimspace(var.servicebus_dream_cron_expression))) == 5
+    error_message = "servicebus_dream_cron_expression must contain five cron fields."
+  }
+}
+
+variable "scheduled_learning_focus" {
+  type    = string
+  default = "Review recent meaningful work for reusable, privacy-safe Role Skill improvements."
+}
+
+variable "scheduled_learning_max_records" {
+  type    = number
+  default = 3
+
+  validation {
+    condition     = var.scheduled_learning_max_records >= 1 && var.scheduled_learning_max_records <= 10
+    error_message = "scheduled_learning_max_records must be between 1 and 10."
+  }
+}
+
+variable "scheduled_learning_retry_limit" {
+  type    = number
+  default = 3
+
+  validation {
+    condition     = var.scheduled_learning_retry_limit >= 0 && var.scheduled_learning_retry_limit <= 10
+    error_message = "scheduled_learning_retry_limit must be between 0 and 10."
+  }
+}
+
+variable "scheduled_learning_retry_backoff_seconds" {
+  type    = number
+  default = 30
+
+  validation {
+    condition     = var.scheduled_learning_retry_backoff_seconds >= 1 && var.scheduled_learning_retry_backoff_seconds <= 3600
+    error_message = "scheduled_learning_retry_backoff_seconds must be between 1 and 3600."
+  }
+}
+
+variable "scheduled_learning_prepare_packet" {
+  type    = bool
+  default = true
+}
+
+
+variable "collective_learning_approval_private_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "collective_learning_approval_public_key" {
+  type    = string
+  default = ""
+}
+
+variable "runtime_image" {
+  type    = string
+  default = ""
+}
+
+variable "runtime_disk_source_image" {
+  type    = string
+  default = ""
+}
+
+variable "runtime_disk_image_name" {
+  type    = string
+  default = "hermes-api-server-image"
+}
+
+variable "api_server_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "foundry_toolbox_mcp_url" {
+  type    = string
+  default = ""
+  validation {
+    condition     = var.foundry_toolbox_mcp_url == "" || startswith(var.foundry_toolbox_mcp_url, "https://")
+    error_message = "The Foundry toolbox must use an HTTPS endpoint."
+  }
+}
+
+variable "previous_api_server_key" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+
+variable "agent365_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "agent365_tenant_id" {
+  type    = string
+  default = ""
+}
+
+variable "agent365_agent_identity_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "agent365_agent_identity_object_id" {
+  type    = string
+  default = ""
+}
+
+variable "agent365_agent_user_id" {
+  type    = string
+  default = ""
+}
+
+variable "agent365_agent_user_principal_name" {
+  type    = string
+  default = ""
+}
+
+variable "private_mcp_api_audience" {
+  type    = string
+  default = ""
+}
+
+variable "public_shipments_mcp_api_audience" {
+  type    = string
+  default = ""
+}
+
+variable "workiq_mail_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_MailTools"
+}
+
+variable "workiq_mail_mcp_scope" {
+  type    = string
+  default = "16b1878d-62c7-4009-aa25-68989d63bbad/Tools.ListInvoke.All"
+}
+
+variable "workiq_word_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_WordServer"
+}
+
+variable "workiq_word_mcp_scope" {
+  type    = string
+  default = "c2d0c2b6-8013-4346-9f8b-b81d3b754a29/Tools.ListInvoke.All"
+}
+
+variable "workiq_teams_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_TeamsServer"
+}
+
+variable "workiq_teams_mcp_scope" {
+  type    = string
+  default = "ce5029ee-c1d3-45c0-bdcc-efb5a4245687/Tools.ListInvoke.All"
+}
+
+variable "workiq_calendar_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_CalendarTools"
+}
+
+variable "workiq_calendar_mcp_scope" {
+  type    = string
+  default = "910333d2-47e9-43ca-981f-6df2f4531ef4/Tools.ListInvoke.All"
+}
+
+variable "workiq_onedrive_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_OneDriveRemoteServer"
+}
+
+variable "workiq_onedrive_mcp_scope" {
+  type    = string
+  default = "b0b2a2bb-6361-4549-a00c-a018417eb8e2/Tools.ListInvoke.All"
+}
+
+variable "workiq_sharepoint_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_SharePointRemoteServer"
+}
+
+variable "workiq_sharepoint_mcp_scope" {
+  type    = string
+  default = "292cff14-c0e8-4116-9e3b-99934ae05766/Tools.ListInvoke.All"
+}
+
+variable "workiq_excel_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_ExcelServer"
+}
+
+variable "workiq_excel_mcp_scope" {
+  type    = string
+  default = "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/McpServers.Excel.All"
+}
+
+variable "workiq_copilot_mcp_url" {
+  type    = string
+  default = "https://agent365.svc.cloud.microsoft/agents/servers/mcp_M365Copilot"
+}
+
+variable "workiq_copilot_mcp_scope" {
+  type    = string
+  default = "ab7c82de-7946-4454-ac28-70249d17c95e/Tools.ListInvoke.All"
+}

@@ -1,0 +1,12 @@
+{
+  "upstream_repository": "https://github.com/tkubica12/agent-demos",
+  "upstream_project": "autopilots-on-azure",
+  "upstream_commit": "173f7ce2e2798a8d67c7e880906932eadec01985",
+  "includes_uncommitted_local_scaffold_changes": true,
+  "original_local_scaffold_patch_sha256": "5645D40C8AD3EBAED412CC558522BC7BABD42C267B07B53E44A3E77D075E436E",
+  "includes_additional_otto_prototype_changes": true,
+  "layout": "Vendored source snapshot; no nested repository or submodule.",
+  "local_only_git_metadata": ".local/migration/agent-demos.git",
+  "local_only_migration_manifest": ".local/migration/file-manifest.json",
+  "original_shared_checkout_modified": false
+}

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="340" viewBox="0 0 1000 340" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Native Service Bus wake for Hermes cron</title>
+  <desc>A native cron provider queues only the next occurrence. A managed receiver wakes the gateway through OnDemand execution. The runtime claims its existing execution, delivers through the original channel, and the owning connection completes the lease.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#0f6cbd"/></marker>
+  </defs>
+  <rect width="1000" height="340" fill="#fff"/>
+  <g stroke="#0f6cbd" stroke-width="1.7" fill="none" marker-end="url(#arrow)">
+    <path d="M300 75H350"/><path d="M650 75H700"/><path d="M840 120V205"/>
+    <path d="M700 250H650"/><path d="M350 250H300"/>
+  </g>
+  <g fill="#f3f3f3" stroke="#616161" stroke-width="1.3">
+    <rect x="20" y="30" width="280" height="90" rx="8"/>
+    <rect x="350" y="30" width="300" height="90" rx="8"/>
+    <rect x="700" y="30" width="280" height="90" rx="8"/>
+    <rect x="700" y="205" width="280" height="90" rx="8"/>
+    <rect x="350" y="205" width="300" height="90" rx="8"/>
+    <rect x="20" y="205" width="280" height="90" rx="8"/>
+  </g>
+  <g text-anchor="middle" fill="#202020" font-size="16" font-weight="600">
+    <text x="160" y="62">1. Native cron changes</text>
+    <text x="500" y="62">2. Next occurrence queued</text>
+    <text x="840" y="62">3. Native receiver wakes gateway</text>
+    <text x="840" y="237">4. Runtime claims and executes</text>
+    <text x="500" y="237">5. Originating channel receives</text>
+    <text x="160" y="237">6. Complete the owning lease</text>
+  </g>
+  <g text-anchor="middle" fill="#404040" font-size="13">
+    <text x="160" y="88">Schedule and ledger stay in Worker home</text>
+    <text x="160" y="107">Root disk with native Blob backups</text>
+    <text x="500" y="88">Worker, job, revision, occurrence, due time</text>
+    <text x="500" y="107">No private prompt or document bytes</text>
+    <text x="840" y="88">Platform-owned PeekLock + OnDemand</text>
+    <text x="840" y="107">Gateway may be Memory-suspended</text>
+    <text x="840" y="263">Revision fence and durable execution receipt</text>
+    <text x="840" y="282">No repeated model run on delivery retry</text>
+    <text x="500" y="263">Authenticated conversation binding</text>
+    <text x="500" y="282">Visible result is separate from transport ACK</text>
+    <text x="160" y="263">Renew and settle through caller-owned MI</text>
+    <text x="160" y="282">Native cron arms the next occurrence</text>
+    <text x="500" y="160">Idle actors suspend; no application receive loop stays awake.</text>
+    <text x="500" y="325">Callback success is a durable receipt, never proof that the broker message was acknowledged.</text>
+  </g>
+</svg>

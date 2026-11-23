@@ -1,0 +1,36 @@
+[prototype]
+name = "Otto Autopilot"
+worker = "otto"
+source_repository = "https://github.com/tkubica12/agent-demos"
+source_project = "autopilots-on-azure"
+deadline_utc = "2026-11-15T20:00:00Z"
+language = "en"
+
+[azure]
+subscription_id = "673af34d-6b28-41dc-bc7b-f507418045e6"
+tenant_id = "6ce4f237-667f-43f5-aafd-cbef954adf97"
+resource_group = "rg-autopilots-ehvw"
+foundry_project = "https://autopilots-ehvw.services.ai.azure.com/api/projects/autopilots-project"
+webiq_resource_id = "/subscriptions/673af34d-6b28-41dc-bc7b-f507418045e6/resourceGroups/ai-services/providers/Microsoft.WebIQ/accounts/tomwebiq"
+toolbox_name = "otto-cio-forum"
+
+[limits]
+ai_credits_usd = 1000
+azure_usd = 1100
+test_concurrency = 1
+maximum_live_test_turns = 100
+maximum_test_duration_seconds = 1800
+allow_license_purchases = false
+allow_shared_platform_apply = false
+allow_existing_worker_changes = false
+
+[personas]
+tomas = "tomas@tomasonline.net"
+tomas_object_id = "e011e2a1-33d6-418f-b2ed-35f7d2281f45"
+ladislav = "ladislav@tomasonline.net"
+emma = "emma@tomasonline.net"
+otto = "otto@tomasonline.net"
+
+[content]
+agent_assets = "../otto_assets"
+excluded_from_agent = ["demo-budget-season.md", "message-for-ladislav.cs.md"]

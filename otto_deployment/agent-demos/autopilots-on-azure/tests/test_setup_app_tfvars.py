@@ -1,0 +1,277 @@
+import unittest
+import tempfile
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+import scripts.setup_app_tfvars as setup_app_tfvars
+from scripts.setup_app_tfvars import (
+    build_tfvars,
+    existing_app_tfvars,
+    load_or_create_collective_approval_identity,
+    resolve_deployer_principal_id,
+    runtime_app_tfvars_path,
+    runtime_outputs_path,
+    runtime_workspace,
+)
+
+
+class SetupAppTfvarsTests(unittest.TestCase):
+    def test_existing_deployer_does_not_follow_the_current_login(self):
+        original = "11111111-2222-3333-4444-555555555555"
+        with patch.object(setup_app_tfvars, "output") as current_login:
+            self.assertEqual(
+                resolve_deployer_principal_id({"deployer_principal_id": original}), original,
+            )
+            current_login.assert_not_called()
+
+    def test_missing_original_deployer_never_silently_grants_the_current_user(self):
+        with patch.object(setup_app_tfvars, "output") as current_login:
+            with self.assertRaisesRegex(ValueError, "original principal"):
+                resolve_deployer_principal_id({"autopilot_name": "existing-worker"})
+            current_login.assert_not_called()
+
+    def test_fresh_worker_pins_its_initial_deployer(self):
+        principal = "11111111-2222-3333-4444-555555555555"
+        with patch.object(setup_app_tfvars, "output", return_value=principal):
+            self.assertEqual(resolve_deployer_principal_id({}), principal)
+
+    def test_worker_owner_is_validated_and_preserved_on_updates(self):
+        owner = "a12de0c7-f871-4bbe-b037-780688a5666d"
+        common = {
+            "runtime": "hermes", "autopilot_name": "worker",
+            "role_blueprint": "junior-project-manager", "role_blueprint_source": "https://example.com/repo.git",
+            "role_release": "1.0.0", "role_release_commit": "a" * 40,
+        }
+        first = build_tfvars(previous={}, worker_owner_id=owner.upper(), **common)
+        self.assertEqual(first["worker_owner_id"], owner)
+        self.assertEqual(build_tfvars(previous=first, **common)["worker_owner_id"], owner)
+        with self.assertRaises(ValueError):
+            build_tfvars(previous={}, worker_owner_id="owner@contoso.com", **common)
+
+    def test_generated_blueprint_loading_is_keyless_and_does_not_decrypt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            generated = root / ".local" / "worker-one" / "agent365" / "a365.generated.config.json"
+            generated.parent.mkdir(parents=True)
+            for secret_fields in ({}, {"agentBlueprintClientSecret": "opaque-protected-value",
+                                      "agentBlueprintClientSecretProtected": True}):
+                generated.write_text(json.dumps({"agentBlueprintId": "blueprint", **secret_fields}), encoding="utf-8")
+                with patch.object(setup_app_tfvars, "REPO_ROOT", root):
+                    self.assertEqual(setup_app_tfvars.load_agent365_auth("hermes", "worker-one"),
+                                     {"client_id": "blueprint"})
+
+    def test_runtime_image_digest_and_disk_source_pair_persist(self):
+        values = {}
+        for prefix in ("runtime",):
+            values[f"{prefix}_image"] = f"registry.example/{prefix}@sha256:digest"
+            values[f"{prefix}_disk_source_image"] = f"registry.example/{prefix}:build-1"
+        kwargs = dict(runtime="hermes", autopilot_name="worker",
+                      role_blueprint="jpm", role_blueprint_source="https://example.com/roles.git",
+                      role_release="3.0.0", role_release_commit="a" * 40)
+        configured = build_tfvars(previous={}, **kwargs, **values)
+        reused = build_tfvars(previous=configured, **kwargs)
+        for key, value in values.items():
+            self.assertEqual(reused[key], value)
+
+    def test_changed_image_never_silently_reuses_old_disk_source(self):
+        for prefix in ("runtime",):
+            kwargs = dict(runtime="hermes", autopilot_name="worker",
+                          role_blueprint="jpm", role_blueprint_source="https://example.com/roles.git",
+                          role_release="3.0.0", role_release_commit="a" * 40)
+            previous = {f"{prefix}_image": "registry/image@sha256:old",
+                        f"{prefix}_disk_source_image": "registry/image:old"}
+            with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError, "stale disk source"):
+                build_tfvars(previous=previous, **kwargs, **{f"{prefix}_image": "registry/image@sha256:new"})
+            updated = build_tfvars(previous=previous, **kwargs, **{
+                f"{prefix}_image": "registry/image@sha256:new",
+                f"{prefix}_disk_source_image": "registry/image:new",
+            })
+            self.assertEqual(updated[f"{prefix}_disk_source_image"], "registry/image:new")
+
+    def test_collective_learning_approval_identity_is_stable(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "approval.json"
+            first = load_or_create_collective_approval_identity(path)
+            second = load_or_create_collective_approval_identity(path)
+
+        self.assertEqual(first, second)
+        self.assertEqual(len(first["privateKey"]), 44)
+        self.assertEqual(len(first["publicKey"]), 44)
+
+    def test_hermes_tfvars_include_api_server_key_and_pinned_role_release(self):
+        tfvars = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous={},
+            api_server_key="api-key",
+            runtime_image="registry.example/hermes-runtime@sha256:test",
+            agent365_client_id="blueprint-id",
+            agent365_tenant_id="tenant-id",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://github.com/example/agent-demos.git",
+            role_blueprint_path="autopilots-on-azure/blueprints/junior-project-manager",
+            role_release="3.0.0",
+            role_release_commit="a" * 40,
+            assignment_scope="team-alpha",
+            collective_approval_private_key="approval-private",
+            collective_approval_public_key="approval-public",
+        )
+
+        self.assertEqual(tfvars["agent_runtime"], "hermes")
+        self.assertEqual(tfvars["autopilot_name"], "hermes")
+        self.assertNotIn("runtime_data_volume_name", tfvars)
+        self.assertEqual(tfvars["api_server_key"], "api-key")
+        self.assertEqual(tfvars["runtime_image"], "registry.example/hermes-runtime@sha256:test")
+        self.assertNotIn("bridge_image", tfvars)
+        self.assertNotIn("private_mcp_image", tfvars)
+        self.assertEqual(tfvars["runtime_disk_image_name"], "hermes-api-server-image")
+        self.assertEqual(tfvars["agent365_client_id"], "blueprint-id")
+        self.assertNotIn("agent365_client_secret", tfvars)
+        self.assertEqual(tfvars["agent365_tenant_id"], "tenant-id")
+        self.assertEqual(tfvars["hermes_role_blueprint"], "junior-project-manager")
+        self.assertEqual(tfvars["hermes_role_release"], "3.0.0")
+        self.assertEqual(tfvars["hermes_role_release_commit"], "a" * 40)
+        self.assertEqual(tfvars["worker_assignment_scope"], "team-alpha")
+        self.assertEqual(tfvars["collective_learning_approval_private_key"], "approval-private")
+        self.assertEqual(tfvars["collective_learning_approval_public_key"], "approval-public")
+        self.assertNotIn("scheduled_learning_enabled", tfvars)
+        self.assertNotIn("scheduled_learning_interval_seconds", tfvars)
+        self.assertTrue(tfvars["scheduled_learning_prepare_packet"])
+        self.assertFalse(tfvars["servicebus_dream_enabled"])
+        self.assertEqual(tfvars["servicebus_dream_cron_expression"], "0 2 * * *")
+
+    def test_scheduled_learning_values_override_and_then_persist(self):
+        configured = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous={},
+            api_server_key="api-key",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://example.com/roles.git",
+            role_release="3.2.0",
+            role_release_commit="a" * 40,
+            scheduled_learning_focus="review delivery handoffs",
+            scheduled_learning_max_records=2,
+            scheduled_learning_retry_limit=4,
+            scheduled_learning_retry_backoff_seconds=15,
+            scheduled_learning_prepare_packet=False,
+            servicebus_dream_enabled=True,
+            servicebus_dream_cron_expression="15 3 * * *",
+        )
+        reused = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous=configured,
+            api_server_key="api-key",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://example.com/roles.git",
+            role_release="3.2.0",
+            role_release_commit="a" * 40,
+        )
+
+        self.assertNotIn("scheduled_learning_enabled", reused)
+        self.assertEqual(reused["scheduled_learning_focus"], "review delivery handoffs")
+        self.assertEqual(reused["scheduled_learning_max_records"], 2)
+        self.assertEqual(reused["scheduled_learning_retry_limit"], 4)
+        self.assertEqual(reused["scheduled_learning_retry_backoff_seconds"], 15)
+        self.assertFalse(reused["scheduled_learning_prepare_packet"])
+        self.assertTrue(reused["servicebus_dream_enabled"])
+        self.assertEqual(reused["servicebus_dream_cron_expression"], "15 3 * * *")
+
+    def test_agent365_auth_values_are_reused_from_previous_tfvars(self):
+        tfvars = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous={
+                "agent365_client_id": "previous-client",
+                "agent365_tenant_id": "previous-tenant",
+            },
+            api_server_key="api-key",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://example.com/roles.git",
+            role_release="3.0.0",
+            role_release_commit="a" * 40,
+        )
+
+        self.assertEqual(tfvars["agent365_client_id"], "previous-client")
+        self.assertNotIn("agent365_client_secret", tfvars)
+        self.assertEqual(tfvars["agent365_tenant_id"], "previous-tenant")
+
+    def test_api_server_key_rotation_preserves_previous_key_for_refresh_preflight(self):
+        tfvars = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous={"api_server_key": "old-key"},
+            api_server_key="new-key",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://example.com/roles.git",
+            role_release="3.0.0",
+            role_release_commit="a" * 40,
+        )
+
+        self.assertEqual(tfvars["api_server_key"], "new-key")
+        self.assertEqual(tfvars["previous_api_server_key"], "old-key")
+
+    def test_runtime_tfvars_preserve_identity_and_mcp_values(self):
+        tfvars = build_tfvars(
+            runtime="hermes",
+            autopilot_name="hermes",
+            previous={
+                "agent365_agent_identity_client_id": "agent-id",
+                "agent365_agent_user_id": "agent-user-id",
+                "private_mcp_api_audience": "api://private",
+                "public_shipments_mcp_api_audience": "api://shipments",
+            },
+            api_server_key="api-key",
+            role_blueprint="junior-project-manager",
+            role_blueprint_source="https://example.com/roles.git",
+            role_release="3.0.0",
+            role_release_commit="a" * 40,
+        )
+
+        self.assertEqual(tfvars["agent365_agent_identity_client_id"], "agent-id")
+        self.assertEqual(tfvars["agent365_agent_user_id"], "agent-user-id")
+        self.assertEqual(tfvars["private_mcp_api_audience"], "api://private")
+        self.assertEqual(tfvars["public_shipments_mcp_api_audience"], "api://shipments")
+
+    def test_hermes_role_release_requires_full_commit_pinning(self):
+        with self.assertRaisesRegex(ValueError, "full 40-character"):
+            build_tfvars(
+                runtime="hermes",
+                autopilot_name="hermes",
+                previous={},
+                role_blueprint="junior-project-manager",
+                role_blueprint_source="https://github.com/example/agent-demos.git",
+                role_release="3.0.0",
+                role_release_commit="main",
+            )
+
+    def test_runtime_defaults_keep_side_by_side_state_distinct(self):
+        self.assertEqual(runtime_workspace("hermes"), Path.cwd() / ".local" / "hermes" / "apps")
+        self.assertEqual(runtime_app_tfvars_path("hermes"), Path.cwd() / ".local" / "hermes" / "apps" / "generated.app.auto.tfvars.json")
+        self.assertEqual(runtime_outputs_path("hermes"), Path.cwd() / ".local" / "hermes" / "apps" / "terraform-outputs.json")
+        self.assertEqual(
+            runtime_app_tfvars_path("hermes", "hermes2"),
+            Path.cwd() / ".local" / "hermes2" / "apps" / "generated.app.auto.tfvars.json",
+        )
+
+    def test_named_worker_tfvars_ignore_active_worker_values(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            apps_dir = root / "terraform" / "apps"
+            apps_dir.mkdir(parents=True)
+            (apps_dir / "generated.runtime.auto.tfvars.json").write_text(
+                '{"agent_runtime":"hermes","autopilot_name":"other-worker"}',
+                encoding="utf-8",
+            )
+            hermes_dir = root / ".local" / "hermes" / "apps"
+            hermes_dir.mkdir(parents=True)
+
+            with patch.object(setup_app_tfvars, "REPO_ROOT", root), patch.object(setup_app_tfvars, "APPS_DIR", apps_dir):
+                self.assertEqual(existing_app_tfvars("hermes"), {})
+                self.assertEqual(existing_app_tfvars("hermes", "hermes2"), {})
+
+
+if __name__ == "__main__":
+    unittest.main()

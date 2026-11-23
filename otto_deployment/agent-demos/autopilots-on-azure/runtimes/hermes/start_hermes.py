@@ -1,0 +1,901 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import re
+import secrets
+import signal
+import socket
+import subprocess
+import shutil
+import sys
+import threading
+import time
+from contextlib import nullcontext
+from pathlib import Path
+from typing import Any
+
+import httpx
+import uvicorn
+import yaml
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+
+from runtime_backup import BackupLoop, restore_latest
+from runtime_keepalive import get_keepalive
+from bridge.hermes_telemetry import (
+    GatewayTraceConflictError,
+    gateway_trace_context,
+    install_gateway_telemetry,
+)
+from bridge.telemetry import configure_telemetry, flush_telemetry, runtime_trace_headers
+from bridge.telemetry_http import TelemetryMiddleware
+from autopilots_identity.document_operations import (
+    acknowledge_delivery as acknowledge_document_delivery,
+    claim_delivery as claim_document_delivery,
+    configure_background_retry,
+    copy_now as copy_document_now,
+    fail_delivery as fail_document_delivery,
+    pending_choices as pending_document_choices,
+    process_background_retry,
+)
+from autopilots_identity.interaction_actions import claim_interaction
+from autopilots_identity.visual_artifact_renderer import render as render_visual_artifact
+from autopilots_identity.collaboration_mcp import (
+    bind_pending_publish_scope,
+)
+from blueprint import (
+    RoleReleaseInstall,
+    install_or_refresh_role_release,
+    role_release_settings_from_environment,
+)
+PLUGIN_NAME = "autopilots"
+RETIRED_PLUGINS = ("keepalive", "autopilots-telemetry")
+HERMES_ACCOUNT = "hermes"
+UPSTREAM_STAGE2 = "/opt/hermes/docker/stage2-hook.sh"
+UPSTREAM_HERMES = "/opt/hermes/bin/hermes"
+S6_COMMANDS = "/command:/package/admin/s6/command"
+
+WORKIQ_MCP_ENVIRONMENTS = {
+    "workiq-mail": "WORKIQ_MAIL_MCP_URL",
+    "workiq-word": "WORKIQ_WORD_MCP_URL",
+    "workiq-teams": "WORKIQ_TEAMS_MCP_URL",
+    "workiq-calendar": "WORKIQ_CALENDAR_MCP_URL",
+    "workiq-onedrive": "WORKIQ_ONEDRIVE_MCP_URL",
+    "workiq-sharepoint": "WORKIQ_SHAREPOINT_MCP_URL",
+    "workiq-excel": "WORKIQ_EXCEL_MCP_URL",
+    "workiq-copilot": "WORKIQ_COPILOT_MCP_URL",
+}
+
+
+DEFAULT_HERMES_HOME = "/data/hermes"
+DEFAULT_GATEWAY_PORT = 9119
+DEFAULT_AGENT_MCP_PROXY_PORT = 18081
+DEFAULT_M365_COLLABORATION_MCP_PORT = 18082
+
+
+def bool_env(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def hermes_home() -> Path:
+    return Path(os.getenv("HERMES_HOME", DEFAULT_HERMES_HOME)).expanduser()
+
+
+def runtime_backup_dir() -> Path | None:
+    value = os.getenv("RUNTIME_BACKUP_DIR", "").strip()
+    return Path(value) if value else None
+
+
+def api_server_port() -> int:
+    return int(os.getenv("API_SERVER_PORT", os.getenv("PORT", "8642")))
+
+
+def gateway_port() -> int:
+    return int(os.getenv("HERMES_GATEWAY_PORT", str(DEFAULT_GATEWAY_PORT)))
+
+
+def write_env_file(home: Path) -> Path:
+    configure_model_environment()
+    env_path = home / ".env"
+    values = {
+        "API_SERVER_ENABLED": os.getenv("API_SERVER_ENABLED", "true"),
+        "API_SERVER_HOST": "127.0.0.1",
+        "API_SERVER_PORT": str(gateway_port()),
+        "API_SERVER_KEY": os.getenv("API_SERVER_KEY", ""),
+        "HERMES_HOME": str(home),
+        "OPENAI_BASE_URL": os.getenv("OPENAI_BASE_URL", ""),
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
+        "AZURE_FOUNDRY_BASE_URL": os.getenv("AZURE_FOUNDRY_BASE_URL", ""),
+        "AZURE_FOUNDRY_API_KEY": os.getenv("AZURE_FOUNDRY_API_KEY", ""),
+        "HERMES_INFERENCE_MODEL": os.getenv("HERMES_INFERENCE_MODEL", ""),
+        "HERMES_MODEL_PROVIDER": os.getenv("HERMES_MODEL_PROVIDER", ""),
+        "HERMES_MODEL": os.getenv("HERMES_MODEL", ""),
+        "PRIVATE_INCIDENTS_MCP_URL": os.getenv("PRIVATE_INCIDENTS_MCP_URL", ""),
+        "PUBLIC_SHIPMENTS_MCP_URL": os.getenv("PUBLIC_SHIPMENTS_MCP_URL", ""),
+        "WORKIQ_MAIL_MCP_URL": os.getenv("WORKIQ_MAIL_MCP_URL", ""),
+        "WORKIQ_WORD_MCP_URL": os.getenv("WORKIQ_WORD_MCP_URL", ""),
+        "FOUNDRY_TOOLBOX_MCP_URL": os.getenv("FOUNDRY_TOOLBOX_MCP_URL", ""),
+        **{
+            environment_name: os.getenv(environment_name, "")
+            for environment_name in WORKIQ_MCP_ENVIRONMENTS.values()
+        },
+        "M365_COLLABORATION_MCP_URL": os.getenv(
+            "M365_COLLABORATION_MCP_URL",
+            "",
+        ),
+    }
+    managed = {key: value for key, value in values.items() if value}
+    existing_lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    rendered: list[str] = []
+    replaced: set[str] = set()
+    for line in existing_lines:
+        key, separator, _ = line.partition("=")
+        if separator and key in values:
+            if key in managed:
+                rendered.append(f"{key}={managed[key]}")
+                replaced.add(key)
+            continue
+        rendered.append(line)
+    if rendered and rendered[-1]:
+        rendered.append("")
+    rendered.extend(f"{key}={value}" for key, value in managed.items() if key not in replaced)
+    env_path.write_text("\n".join(rendered).rstrip() + "\n", encoding="utf-8")
+    return env_path
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def hermes_config(home: Path, base: dict[str, Any] | None = None) -> dict[str, Any]:
+    configure_model_environment()
+    runtime_config: dict[str, Any] = {
+        "model": {
+            "provider": os.getenv("HERMES_MODEL_PROVIDER", "azure-foundry"),
+            "default": os.getenv("HERMES_MODEL", "gpt-6-1-sol"),
+            "api_mode": "responses",
+        },
+        "memory": {"nudge_interval": int(os.getenv("HERMES_MEMORY_NUDGE_INTERVAL", "10"))},
+        "skills": {
+            "creation_nudge_interval": int(os.getenv("HERMES_SKILL_NUDGE_INTERVAL", "10")),
+            "ledger": True,
+            "write_approval": bool_env("HERMES_SKILL_WRITE_APPROVAL", False),
+        },
+        "auxiliary": {"background_review": {"enabled": True}},
+        "curator": {"enabled": False},
+        "cron": {"misfire_grace_minutes": 0},
+        "plugins": {"auto_update_check_hours": 0},
+        "updates": {"check": False},
+        "telemetry": {"shared_metrics": {"enabled": False, "send": False}},
+        "security": {"allow_lazy_installs": False},
+        "gateway": {
+            "platforms": {
+                "api_server": {
+                    "enabled": True,
+                    "host": "127.0.0.1",
+                    "port": gateway_port(),
+                    "api_key": os.getenv("API_SERVER_KEY", ""),
+                }
+            }
+        },
+        "paths": {
+            "home": str(home),
+            "workspace": str(home / "workspace"),
+        },
+    }
+    foundry_url = os.getenv("FOUNDRY_OPENAI_BASE_URL", "").strip()
+    if foundry_url:
+        runtime_config["model"].update(
+            {
+                "provider": "azure-foundry",
+                "base_url": foundry_url.rstrip("/"),
+                "auth_mode": "entra_id",
+                "entra": {
+                    "scope": os.getenv(
+                        "FOUNDRY_TOKEN_SCOPE",
+                        "https://ai.azure.com/.default",
+                    )
+                },
+            }
+        )
+    mcp_servers: dict[str, Any] = {}
+    disabled_servers = {
+        name.strip() for name in os.getenv("HERMES_DISABLED_MCP_SERVERS", "").split(",") if name.strip()
+    }
+    private_server_name = os.getenv("PRIVATE_MCP_SERVER_NAME", "").strip() or "private-incidents"
+    private_mcp_url = os.getenv("PRIVATE_INCIDENTS_MCP_URL", "").strip()
+    public_shipments_mcp_url = os.getenv("PUBLIC_SHIPMENTS_MCP_URL", "").strip()
+    if private_mcp_url:
+        mcp_servers[private_server_name] = {"url": private_mcp_url}
+    if public_shipments_mcp_url:
+        mcp_servers["public-shipments"] = {"url": public_shipments_mcp_url}
+    toolbox_url = os.getenv("FOUNDRY_TOOLBOX_MCP_URL", "").strip()
+    if toolbox_url:
+        mcp_servers["foundry-toolbox"] = {
+            "url": toolbox_url, "connect_timeout": 60, "timeout": 180,
+        }
+    for name, environment_name in WORKIQ_MCP_ENVIRONMENTS.items():
+        url = os.getenv(environment_name, "").strip()
+        if url:
+            mcp_servers[name] = {"url": url}
+    collaboration_url = os.getenv(
+        "M365_COLLABORATION_MCP_URL",
+        "",
+    ).strip()
+    if collaboration_url:
+        mcp_servers["m365-collaboration"] = {
+            "url": collaboration_url,
+            "connect_timeout": 30,
+            "timeout": 900,
+        }
+    for name in disabled_servers:
+        mcp_servers.pop(name, None)
+    if mcp_servers:
+        runtime_config["mcp_servers"] = mcp_servers
+    if bool_env("USER_SCHEDULING_ENABLED", False):
+        runtime_config["cron"].update({"provider": "azure", "mirror_delivery": False})
+    config = _deep_merge(base or {}, runtime_config)
+    if not bool_env("USER_SCHEDULING_ENABLED", False):
+        for inherited in ("provider", "mirror_delivery"):
+            config["cron"].pop(inherited, None)
+    plugins = dict(config.get("plugins") or {})
+    if PLUGIN_NAME in (plugins.get("disabled") or []):
+        raise ValueError(f"Hermes {PLUGIN_NAME} plugin must not be disabled.")
+    enabled_plugins = plugins.get("enabled") or []
+    if not isinstance(enabled_plugins, list):
+        raise ValueError("Hermes plugins.enabled must be a list.")
+    plugins["enabled"] = list(dict.fromkeys([
+        *(name for name in enabled_plugins if name not in RETIRED_PLUGINS), PLUGIN_NAME,
+    ]))
+    config["plugins"] = plugins
+    config["model"].pop("name", None)
+    configured_servers = config.get("mcp_servers")
+    if isinstance(configured_servers, dict):
+        for name in (
+            "private-incidents",
+            "budget-planning",
+            "public-shipments",
+            "foundry-toolbox",
+            *WORKIQ_MCP_ENVIRONMENTS,
+            "m365-collaboration",
+        ):
+            if name not in mcp_servers:
+                configured_servers.pop(name, None)
+        if not configured_servers:
+            config.pop("mcp_servers", None)
+    return config
+
+
+
+
+def install_runtime_plugins(profile_home: Path, source_root: Path = Path("/app/runtime_plugins")) -> None:
+    """Replace image-owned plugins exactly, so files removed from the image disappear from the profile."""
+    destination_root = profile_home / "plugins"
+    destination_root.mkdir(parents=True, exist_ok=True)
+    for name in RETIRED_PLUGINS:
+        shutil.rmtree(destination_root / name, ignore_errors=True)
+    if not source_root.is_dir():
+        return
+    for source in source_root.iterdir():
+        if source.is_dir():
+            shutil.rmtree(destination_root / source.name, ignore_errors=True)
+            shutil.copytree(source, destination_root / source.name)
+
+
+def hermes_account() -> tuple[int, int]:
+    import pwd
+
+    entry = pwd.getpwnam(HERMES_ACCOUNT)
+    return entry.pw_uid, entry.pw_gid
+
+
+def own_profile(profile_home: Path, uid: int, gid: int) -> None:
+    """Give the unprivileged Hermes account the profile; a full walk only runs after a 0.19 root-owned layout."""
+    if profile_home.stat().st_uid == uid:
+        targets = [profile_home / name for name in ("config.yaml", ".env", "plugins", "workspace", ".telemetry")]
+    else:
+        targets = [profile_home]
+    for target in targets:
+        if not target.exists():
+            continue
+        for root, directories, files in os.walk(target):
+            for name in [*directories, *files]:
+                path = Path(root) / name
+                if not path.is_symlink():
+                    os.chown(path, uid, gid)
+        os.chown(target, uid, gid)
+
+
+def as_hermes(uid: int, gid: int) -> dict[str, Any]:
+    return {"user": uid, "group": gid, "extra_groups": []}
+
+
+def run_upstream_stage2(profile_home: Path) -> None:
+    """Run the official image bootstrap (ownership, seed directories, bundled skills) as Hermes' non-PID-1 path does."""
+    env = os.environ.copy()
+    env["HERMES_HOME"] = str(profile_home)
+    env["PATH"] = f"{S6_COMMANDS}:{env.get('PATH', '')}"
+    subprocess.run([UPSTREAM_STAGE2], env=env, check=True)
+
+
+def configure_model_environment() -> None:
+    foundry_url = os.getenv("FOUNDRY_OPENAI_BASE_URL", "").strip()
+    if foundry_url:
+        os.environ["OPENAI_BASE_URL"] = foundry_url.rstrip("/")
+        os.environ["AZURE_FOUNDRY_BASE_URL"] = foundry_url.rstrip("/")
+        os.environ.pop("OPENAI_API_KEY", None)
+        os.environ.pop("AZURE_FOUNDRY_API_KEY", None)
+        os.environ["HERMES_MODEL_PROVIDER"] = "azure-foundry"
+        model = os.getenv("HERMES_MODEL") or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME") or "gpt-6-1-sol"
+        os.environ.setdefault("HERMES_MODEL", model)
+        os.environ.setdefault("HERMES_INFERENCE_MODEL", model)
+
+
+def start_agent_mcp_proxy(**account: Any) -> subprocess.Popen | None:
+    if not os.getenv("AGENT_MCP_SERVERS_JSON"):
+        print("AGENT_MCP_SERVERS_JSON is not set; Agent Identity MCP adapter is disabled.", flush=True)
+        return None
+    port = os.getenv("AGENT_MCP_PROXY_PORT", str(DEFAULT_AGENT_MCP_PROXY_PORT))
+    print(f"Starting Agent Identity MCP adapter on 127.0.0.1:{port}", flush=True)
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "autopilots_identity.mcp_proxy:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            port,
+        ],
+        env=os.environ.copy(),
+        **account,
+    )
+
+
+def start_m365_collaboration_mcp(**account: Any) -> subprocess.Popen | None:
+    if not os.getenv("M365_COLLABORATION_MCP_URL", "").strip():
+        return None
+    port = os.getenv(
+        "M365_COLLABORATION_MCP_PORT",
+        str(DEFAULT_M365_COLLABORATION_MCP_PORT),
+    )
+    print(
+        "Starting Agent User collaboration MCP on "
+        f"127.0.0.1:{port}",
+        flush=True,
+    )
+    env = os.environ.copy()
+    env["M365_COLLABORATION_MCP_PORT"] = port
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "autopilots_identity.collaboration_mcp",
+        ],
+        env=env,
+        **account,
+    )
+
+
+LOOPBACK_ADAPTER_MODULES = ("autopilots_identity.mcp_proxy:app", "autopilots_identity.collaboration_mcp")
+
+
+def _adapter_processes(proc: Path, own_pid: int) -> list[int]:
+    found = []
+    for entry in proc.iterdir():
+        if not entry.name.isdigit() or int(entry.name) == own_pid:
+            continue
+        try:
+            argv = [part.decode(errors="replace") for part in (entry / "cmdline").read_bytes().split(b"\0")]
+        except OSError:
+            continue
+        if any(module in argv for module in LOOPBACK_ADAPTER_MODULES):
+            found.append(int(entry.name))
+    return found
+
+
+def reap_orphaned_adapters(proc: Path = Path("/proc"), timeout: float = 10) -> list[int]:
+    """Stop loopback adapters left by a previous wrapper that was killed before its own cleanup.
+
+    A surviving adapter keeps its port, so the new adapter would fail to bind.
+    """
+    if not proc.is_dir():
+        return []
+    stale = _adapter_processes(proc, os.getpid())
+    for pid in stale:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and set(stale) & set(_adapter_processes(proc, os.getpid())):
+        time.sleep(0.2)
+    for pid in set(stale) & set(_adapter_processes(proc, os.getpid())):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if stale:
+        print(f"Stopped orphaned loopback adapters: {sorted(stale)}", flush=True)
+    return stale
+
+
+def stop_children(processes: tuple[subprocess.Popen | None, ...], timeout: float = 10) -> None:
+    """Terminate all children at once so the wrapper exits inside the bootstrap restart window."""
+    running = [process for process in processes if process and process.poll() is None]
+    for process in running:
+        process.terminate()
+    deadline = time.monotonic() + timeout
+    for process in running:
+        try:
+            process.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
+def wait_for_loopback(process: subprocess.Popen, port: int, timeout: float = 30) -> None:
+    """Start Hermes as soon as a local adapter accepts connections instead of after a fixed delay."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"Loopback service on port {port} exited with code {process.returncode}.")
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                return
+        except OSError:
+            time.sleep(0.1)
+    raise TimeoutError(f"Loopback service on port {port} did not start within {timeout:.0f} seconds.")
+
+
+def write_config(home: Path) -> Path:
+    config_path = home / "config.yaml"
+    base: dict[str, Any] = {}
+    if config_path.exists():
+        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(loaded, dict):
+            raise ValueError(f"{config_path} must contain a YAML mapping.")
+        base = loaded
+    config_path.write_text(yaml.safe_dump(hermes_config(home, base), sort_keys=False), encoding="utf-8")
+    return config_path
+
+
+def start_gateway(profile_home: Path, **account: Any) -> subprocess.Popen:
+    env = os.environ.copy()
+    env["HERMES_HOME"] = str(profile_home)
+    env["HOME"] = str(profile_home / "home")
+    env["HERMES_WRITE_SAFE_ROOT"] = str(profile_home / "workspace")
+    return subprocess.Popen(
+        [UPSTREAM_HERMES, "gateway", "run", "--replace", "--accept-hooks"],
+        env=env,
+        cwd=str(profile_home),
+        **account,
+    )
+
+
+def create_health_app(
+    home: Path,
+    profile_home: Path,
+    role_release: RoleReleaseInstall | None,
+    gateway: subprocess.Popen | None,
+    backup: BackupLoop | None = None,
+) -> FastAPI:
+    app = FastAPI(title="Hermes ACA Sandbox runtime")
+    app.add_middleware(TelemetryMiddleware, runtime=True)
+    app.router.add_event_handler("shutdown", flush_telemetry)
+    keepalive = get_keepalive()
+    process_nonce = secrets.token_hex(16)
+
+    @app.middleware("http")
+    async def keep_runtime_request_active(request: Request, call_next):
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and Path("/app/.application-maintenance").exists():
+            return JSONResponse(
+                {"error": "Runtime source maintenance; the request was not admitted."},
+                status_code=503, headers={"Retry-After": "10"},
+            )
+        if keepalive is not None and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            with keepalive.activity("runtime-request"):
+                return await call_next(request)
+        return await call_next(request)
+
+    role_release_health = None
+    if role_release:
+        role_release_health = {
+            "roleBlueprint": role_release.manifest["roleBlueprint"],
+            "roleRelease": role_release.manifest["roleRelease"],
+            "commit": role_release.manifest["roleReleaseCommit"],
+            "workerId": role_release.manifest["workerId"],
+        }
+
+    @app.get("/health")
+    def health() -> JSONResponse:
+        running = gateway is not None and gateway.poll() is None
+        payload = {
+            "status": "ok" if running else "gateway-unavailable",
+            "release": os.getenv("APPLICATION_RELEASE", ""),
+            "nativeRuns": True,
+            "processId": os.getpid(),
+            "memoryNonce": process_nonce,
+            "runtime": "hermes",
+            "hermesHome": str(home),
+            "profileHome": str(profile_home),
+            "configExists": (profile_home / "config.yaml").exists(),
+            "envExists": (profile_home / ".env").exists(),
+            "roleRelease": role_release_health,
+            "gatewayPort": gateway_port(),
+            "apiServerPort": api_server_port(),
+            "gatewayPid": gateway.pid if gateway and gateway.poll() is None else None,
+            "backup": backup.status() if backup else None,
+        }
+        return JSONResponse(payload, status_code=200 if running else 503)
+
+    @app.get("/health/detailed")
+    def health_detailed() -> JSONResponse:
+        return health()
+
+    def require_internal_key(request: Request) -> None:
+        expected = os.getenv("API_SERVER_KEY", "")
+        supplied = request.headers.get("x-autopilot-key", "")
+        if not expected or not secrets.compare_digest(supplied, expected):
+            raise HTTPException(status_code=401, detail="A valid X-Autopilot-Key header is required.")
+
+    @app.post("/internal/visual-artifacts/render")
+    async def visual_artifact_render(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict) or set(payload) != {"scope"}:
+            raise HTTPException(status_code=400, detail="A visual artifact scope is required")
+        try:
+            return await asyncio.to_thread(render_visual_artifact, payload["scope"])
+        except (ValueError, FileNotFoundError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/internal/runtime/status")
+    async def runtime_status(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        key = os.environ["API_SERVER_KEY"]
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                f"http://127.0.0.1:{gateway_port()}/internal/runtime/activity",
+                headers={"X-Autopilot-Key": key, "Authorization": "Bearer " + key},
+            )
+        response.raise_for_status()
+        native = response.json()
+        if not isinstance(native, dict) or not isinstance(native.get("active"), int):
+            raise HTTPException(status_code=502, detail="Native API did not attest its active work.")
+        wrapper = keepalive.status()["active"] if keepalive is not None else 0
+        return {"active": native["active"] + wrapper, "native": native, "wrapperOperations": wrapper}
+
+    @app.post("/internal/documents/pending")
+    async def document_pending(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        operation_scope = (
+            payload.get("operationScope")
+            if isinstance(payload, dict)
+            else None
+        )
+        if not isinstance(operation_scope, str) or not operation_scope:
+            raise HTTPException(
+                status_code=400,
+                detail="operationScope must be a non-empty string.",
+            )
+        return await pending_document_choices(operation_scope)
+
+    @app.post("/internal/documents/bind-scope")
+    async def document_bind_scope(
+        request: Request,
+    ) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Document operation body must be an object.",
+            )
+        try:
+            return bind_pending_publish_scope(
+                str(payload.get("operationId") or ""),
+                str(payload.get("operationScope") or ""),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/documents/background")
+    async def document_background(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Document operation body must be an object.",
+            )
+        try:
+            return configure_background_retry(
+                str(payload.get("operationId") or ""),
+                str(payload.get("operationScope") or ""),
+                str(payload.get("recipientIdentifier") or ""),
+                payload.get("deliveryReference")
+                if isinstance(
+                    payload.get("deliveryReference"),
+                    dict,
+                )
+                else {},
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/documents/process")
+    async def document_process(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        operation_id = (
+            payload.get("operationId")
+            if isinstance(payload, dict)
+            else None
+        )
+        if not isinstance(operation_id, str) or not operation_id:
+            raise HTTPException(
+                status_code=400,
+                detail="operationId must be a non-empty string.",
+            )
+        return await process_background_retry(operation_id)
+
+    @app.post("/internal/documents/copy")
+    async def document_copy(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Document operation body must be an object.",
+            )
+        try:
+            return await copy_document_now(
+                str(payload.get("operationId") or ""),
+                str(payload.get("operationScope") or ""),
+                str(payload.get("recipientIdentifier") or ""),
+                payload.get("deliveryReference")
+                if isinstance(
+                    payload.get("deliveryReference"),
+                    dict,
+                )
+                else {},
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/documents/ack-delivery")
+    async def document_ack_delivery(
+        request: Request,
+    ) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Document delivery body must be an object.",
+            )
+        try:
+            return acknowledge_document_delivery(
+                str(payload.get("operationId") or ""),
+                str(payload.get("deliveryActivityId") or ""),
+                str(payload.get("deliveryAttemptId") or ""),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/documents/claim-delivery")
+    async def document_claim_delivery(
+        request: Request,
+    ) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        operation_id = (
+            payload.get("operationId")
+            if isinstance(payload, dict)
+            else None
+        )
+        try:
+            return claim_document_delivery(
+                str(operation_id or "")
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/documents/fail-delivery")
+    async def document_fail_delivery(
+        request: Request,
+    ) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="Document delivery body must be an object.",
+            )
+        try:
+            return fail_document_delivery(
+                str(payload.get("operationId") or ""),
+                str(payload.get("deliveryAttemptId") or ""),
+                str(payload.get("error") or ""),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.post("/internal/interactions/claim")
+    async def interaction_claim(request: Request) -> dict[str, Any]:
+        require_internal_key(request)
+        payload = await request.json()
+        try:
+            return claim_interaction(
+                profile_home,
+                interaction_id=str(
+                    payload.get("interactionId") or ""
+                ),
+                choice_id=str(payload.get("choiceId") or ""),
+                expires_at_unix=float(
+                    payload.get("expiresAtUnix") or 0
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    async def proxy(path: str, request: Request):
+        target = f"http://127.0.0.1:{gateway_port()}/{path}"
+        if request.url.query:
+            target += "?" + request.url.query
+        native_session = re.fullmatch(r"api/sessions/([^/]+)/chat", path)
+        native_turn = request.method == "POST" and native_session is not None
+        trace_context = (
+            gateway_trace_context(native_session.group(1), profile_home=profile_home)
+            if native_turn
+            else nullcontext()
+        )
+        timeout = httpx.Timeout(
+            float(os.getenv("HERMES_BRIDGE_TIMEOUT_SECONDS", "600")),
+            connect=10,
+        )
+        body = await request.body()
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                with trace_context:
+                    response = await client.request(
+                        request.method,
+                        target,
+                        content=body,
+                        headers={
+                            **{
+                                key: value
+                                for key, value in request.headers.items()
+                                if key.lower() not in {
+                                    "host",
+                                    "traceparent",
+                                    "tracestate",
+                                    "baggage",
+                                    "x-autopilot-otel-session",
+                                    "x-autopilot-otel-operation",
+                                }
+                            },
+                            **runtime_trace_headers(),
+                        },
+                    )
+                    if native_turn and response.status_code >= 500:
+                        response.raise_for_status()
+        except GatewayTraceConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except httpx.HTTPStatusError as exc:
+            response = exc.response
+        except httpx.ConnectError as exc:
+            raise HTTPException(status_code=503, detail="Hermes native API is not accepting requests yet.") from exc
+        if response.headers.get("content-type", "").startswith("application/json"):
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    return app
+
+
+def main() -> None:
+    configure_telemetry("hermes-runtime")
+    home = hermes_home()
+    configure_model_environment()
+    uid, gid = hermes_account()
+    backup_dir = runtime_backup_dir()
+    if backup_dir:
+        restored = restore_latest(home, backup_dir, worker_id=os.getenv("WORKER_ID", ""), **as_hermes(uid, gid))
+        if restored:
+            print(f"Hermes Worker restored from {restored.name}", flush=True)
+    else:
+        print("RUNTIME_BACKUP_DIR is not set; Worker backups are disabled.", flush=True)
+    home.mkdir(parents=True, exist_ok=True)
+    role_release = None
+    profile_home = home
+    role_release_settings = role_release_settings_from_environment()
+    if role_release_settings:
+        role_release = install_or_refresh_role_release(home, role_release_settings)
+        profile_home = role_release.profile_home
+        action = "refreshed" if role_release.changed else "reused"
+        print(
+            f"Hermes Role Release {action}: "
+            f"{role_release_settings.role_blueprint}@{role_release_settings.role_release}",
+            flush=True,
+        )
+    profile_home.mkdir(parents=True, exist_ok=True)
+    (profile_home / "home").mkdir(exist_ok=True)
+    (profile_home / "workspace").mkdir(exist_ok=True)
+    install_runtime_plugins(
+        profile_home,
+        source_root=Path(os.getenv("AUTOPILOTS_APPLICATION_ROOT", "/app")) / "runtime_plugins",
+    )
+    install_gateway_telemetry(profile_home)
+    os.environ["HERMES_HOME"] = str(profile_home)
+    env_path = write_env_file(profile_home)
+    config_path = write_config(profile_home)
+    own_profile(profile_home, uid, gid)
+    print(f"Hermes profile home: {profile_home}; env {env_path}; config {config_path}", flush=True)
+
+    account = as_hermes(uid, gid)
+    mcp_proxy = None
+    collaboration_mcp = None
+    gateway = None
+    try:
+        reap_orphaned_adapters()
+        mcp_proxy = start_agent_mcp_proxy(**account)
+        collaboration_mcp = start_m365_collaboration_mcp(**account)
+        run_upstream_stage2(profile_home)
+        if mcp_proxy:
+            wait_for_loopback(mcp_proxy, int(os.getenv("AGENT_MCP_PROXY_PORT", str(DEFAULT_AGENT_MCP_PROXY_PORT))))
+        if collaboration_mcp:
+            wait_for_loopback(
+                collaboration_mcp,
+                int(os.getenv("M365_COLLABORATION_MCP_PORT", str(DEFAULT_M365_COLLABORATION_MCP_PORT))),
+            )
+        gateway = start_gateway(profile_home, **account)
+        print(f"Started Hermes gateway pid={gateway.pid}", flush=True)
+        os.setgroups([])
+        os.setgid(gid)
+        os.setuid(uid)
+        os.environ["HOME"] = str(profile_home / "home")
+        backup_loop = BackupLoop(profile_home, backup_dir).start() if backup_dir else None
+        app = create_health_app(home, profile_home, role_release, gateway, backup_loop)
+        uvicorn.run(app, host="0.0.0.0", port=api_server_port())
+    finally:
+        stop_children((gateway, collaboration_mcp, mcp_proxy))
+
+
+if __name__ == "__main__":
+    main()

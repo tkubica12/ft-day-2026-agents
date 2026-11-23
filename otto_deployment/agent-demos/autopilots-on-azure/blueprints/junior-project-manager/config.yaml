@@ -1,0 +1,5 @@
+model:
+  provider: azure-foundry
+  name: gpt-6-1-sol
+terminal:
+  cwd: .

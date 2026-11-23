@@ -1,0 +1,698 @@
+from __future__ import annotations
+
+import hashlib
+import ast
+import asyncio
+import json
+import os
+import unittest
+import shlex
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import httpx
+
+from bridge.runtime.base import AgentRequest
+from bridge.runtime.hermes import HermesRuntimeAdapter, bridge_instructions
+from scripts.sandbox_services import (
+    BOOTSTRAP,
+    SERVICE_CONFIG_PATH,
+    SandboxService,
+    convert_disk_image,
+    deploy_service,
+    deploy_runtime,
+    deploy_sandbox_services,
+    gateway_environment,
+    mcp_service,
+    prepare_disk_image,
+    service_body,
+    worker_settings,
+)
+from scripts.sandbox_runtime import AgentSandboxConfig, config_from_environment, runtime_telemetry_environment
+from scripts.application_releases import ApplicationRelease, PYTHON_BASE_IMAGE
+
+
+class SandboxServicesTests(unittest.TestCase):
+    def setUp(self):
+        self.release = ApplicationRelease("gateway", "f" * 64, b"release")
+        for target, value in (
+            ("scripts.sandbox_services.build_release", self.release),
+            ("scripts.sandbox_services.install_release", self.release.directory),
+            ("scripts.sandbox_services.repair_service_supervisor", None),
+        ):
+            item = patch(target, return_value=value)
+            item.start()
+            self.addCleanup(item.stop)
+
+    def group(self, role="gateway"):
+        return {
+            "name": f"worker-{role}", "identity_client_id": f"{role}-client",
+            "identity_resource_id": f"/identities/{role}",
+            "vnet_connection_name": "private-tools" if role in {"runtime", "gateway"} else "",
+        }
+
+    def test_remote_bootstrap_and_quiescence_commands_are_valid_python(self):
+        from scripts.sandbox_services import SUPERVISOR_REPAIR, require_quiescent_service
+        from scripts.application_releases import INSTALL_RELEASE
+        from scripts.native_transport import CALLBACK
+
+        for source in (BOOTSTRAP, SUPERVISOR_REPAIR, INSTALL_RELEASE, CALLBACK):
+            ast.parse(source)
+        sandbox = Mock()
+        def execute(command):
+            script = shlex.split(command)[2]
+            ast.parse(script)
+            self.assertIn("TRANSPORT_ROLE", script)
+            self.assertIn("TRANSPORT_JOURNAL_PATH", script)
+            self.assertIn("127.0.0.1:8000", script)
+            self.assertNotIn("TRANS8000", script)
+            return SimpleNamespace(exit_code=0, stderr="")
+        sandbox.exec.side_effect = execute
+        require_quiescent_service(
+            sandbox, {"environment": {"TRANSPORT_CONNECTION_ID": "/connection"}}, 8000,
+        )
+
+    def config(self):
+        values = dict.fromkeys([
+            "runtime_disk_source_image", "previous_api_server_key",
+            "agent365_agent_user_principal_name", "worker_assignment_scope",
+        ], "")
+        values.update({
+            "agent_runtime": "hermes", "autopilot_name": "worker",
+            "runtime_image": "registry/hermes@sha256:123",
+            "runtime_disk_image_name": "hermes-release",
+            "api_server_key": "runtime-test-key", "agent365_tenant_id": "tenant",
+            "agent365_client_id": "existing-blueprint",
+            "agent365_agent_identity_client_id": "existing-agent-client",
+            "agent365_agent_identity_object_id": "existing-agent-object",
+            "agent365_agent_user_id": "existing-agent-user",
+            "private_mcp_api_audience": "api://incidents", "public_shipments_mcp_api_audience": "api://shipments",
+            "user_scheduling_enabled": True, "document_retry_enabled": True,
+            "servicebus_dream_enabled": True, "servicebus_dream_cron_expression": "15 3 * * *",
+            "scheduled_learning_focus": "review delivery handoffs",
+            "scheduled_learning_max_records": 2, "scheduled_learning_retry_limit": 4,
+            "scheduled_learning_retry_backoff_seconds": 15, "scheduled_learning_prepare_packet": False,
+            "user_scheduling_lock_renewal_seconds": 1800, "user_scheduling_max_delivery_count": 5,
+            "hermes_role_blueprint": "junior-project-manager",
+            "worker_owner_id": "owner-object",
+        })
+        return values
+
+    def infrastructure(self):
+        return {
+            "sandbox_groups": {role: self.group(role) for role in ("runtime", "gateway", "private-mcp", "public-mcp", "generated-apps")},
+            "tenant_id": "tenant", "subscription_id": "subscription",
+            "resource_group_name": "resources", "sandbox_location": "swedencentral",
+            "scheduler_servicebus_queue_name": "worker-schedule",
+            "foundry_agent_name": "autopilots-hermes",
+            "transport": {
+                "connection_ids": {"gateway": "/connections/gateway", "runtime": "/connections/runtime"},
+                "queues": {"activities": "activities", "requests": "requests", "results": "results"},
+                "namespace": "schedule.servicebus.windows.net",
+            },
+        }
+
+    def test_gateway_uses_memory_suspend_and_native_on_demand_ingress(self):
+        service = SandboxService("gateway", "image", 8000, ("python3",), {}, release=self.release)
+        body = service_body(service, self.group(), "disk", "worker")
+        self.assertTrue(body["lifecycle"]["autoSuspendPolicy"]["enabled"])
+        self.assertEqual(body["lifecycle"]["autoSuspendPolicy"]["mode"], "Memory")
+        self.assertEqual(body["lifecycle"]["autoSuspendPolicy"]["interval"], 300)
+        self.assertEqual(body["ports"][0]["auth"], {"anonymous": True})
+        self.assertEqual(body["ports"][0]["activationMode"], "OnDemand")
+        self.assertEqual(body["customerVnetConnectionName"], "private-tools")
+        self.assertEqual(body["entrypoint"], ["python3", "-c", BOOTSTRAP])
+        self.assertTrue(all(len(value) <= 63 for value in body["labels"].values()))
+        self.assertEqual(body["resources"], {"cpu": "500m", "memory": "1024Mi", "disk": "10Gi"})
+        self.assertNotIn("keepalive", BOOTSTRAP)
+        self.assertIn('open("/app/.sandbox-service.log", "a")', BOOTSTRAP)
+        self.assertIn("stderr=subprocess.STDOUT", BOOTSTRAP)
+        self.assertIn("subprocess.Popen", BOOTSTRAP)
+
+    def test_private_and_public_mcp_keep_distinct_authorization(self):
+        private = mcp_service("private-mcp", self.config(), self.infrastructure())
+        public = mcp_service("public-mcp", self.config(), self.infrastructure())
+        self.assertEqual(private.environment["MCP_ALLOWED_OBJECT_IDS"], "existing-agent-object")
+        self.assertEqual(private.environment["MCP_JWT_AUDIENCE"], "incidents")
+        self.assertEqual(public.environment["MCP_JWT_AUDIENCE"], "shipments")
+        self.assertEqual(public.environment["MCP_ALLOWED_ROLES"], "Shipments.Read.All")
+        self.assertNotIn("MCP_ALLOWED_OBJECT_IDS", public.environment)
+
+    def test_suspended_mcp_ingress_wakes_instead_of_rejecting_requests(self):
+        service = mcp_service("private-mcp", self.config(), self.infrastructure())
+        body = service_body(service, self.group("private-mcp"), "disk", "worker")
+        self.assertTrue(body["lifecycle"]["autoSuspendPolicy"]["enabled"])
+        self.assertEqual(body["ports"][0]["activationMode"], "OnDemand")
+
+    def test_budget_profile_replaces_private_tools_but_keeps_agent_identity_authorization(self):
+        import scripts.sandbox_services as services
+        config = {**self.config(), "worker_assignment_profile": "budget-season"}
+        private = mcp_service("private-mcp", config, self.infrastructure())
+        public = mcp_service("public-mcp", config, self.infrastructure())
+        self.assertEqual(private.role, "private-mcp")
+        self.assertEqual(private.command[-1], "budget_planning_mcp.server")
+        self.assertEqual(private.environment["BUDGET_STATE_PATH"], "/app/state/budget-season.sqlite3")
+        self.assertEqual(private.environment["MCP_REQUIRED_ROLES"], "Incidents.Read.All")
+        self.assertEqual(private.environment["MCP_ALLOWED_OBJECT_IDS"], "existing-agent-object")
+        self.assertEqual(public.command[-1], "public_shipments_mcp.server")
+        self.assertEqual(
+            [call.args[0] for call in services.build_release.call_args_list[-2:]], ["budget-mcp", "public-mcp"],
+        )
+        with self.assertRaisesRegex(ValueError, "Unknown worker assignment profile"):
+            mcp_service("private-mcp", {**config, "worker_assignment_profile": "other"}, self.infrastructure())
+
+    def test_budget_profile_flags_reach_gateway_but_not_runtime_compute(self):
+        platform = {
+            "foundry_openai_base_url": "https://foundry/openai/v1", "model_deployment_name": "model",
+            "scheduler_servicebus_fully_qualified_namespace": "schedule.servicebus.windows.net",
+            "application_insights_connection_string": "instrumentation-identifier",
+            "foundry_project_endpoint": "https://foundry/api/projects/project",
+        }
+        endpoints = {"private_mcp_url": "https://private/mcp", "public_shipments_mcp_url": "https://public/mcp",
+                     "runtime_disk_image_id": "runtime-disk"}
+        plain = worker_settings(
+            {**self.config(), "workiq_teams_mcp_url": "https://teams"}, platform, self.infrastructure(), endpoints,
+        )
+        profiled = worker_settings(
+            {**self.config(), "workiq_teams_mcp_url": "https://teams", "worker_assignment_profile": "budget-season"},
+            platform, self.infrastructure(), endpoints,
+        )
+        gateway = gateway_environment(profiled)
+        self.assertEqual(gateway["WORKER_ASSIGNMENT_PROFILE"], "budget-season")
+        self.assertEqual(gateway["M365_TEAMS_COLLABORATION_ENABLED"], "true")
+        self.assertEqual(gateway["M365_OFFICE_COLLABORATION_ENABLED"], "true")
+        self.assertEqual(
+            config_from_environment(profiled).runtime_config_revision,
+            config_from_environment(plain).runtime_config_revision,
+        )
+        request = AgentRequest(prompt="Status?", conversation_id="c", user_id="u", source="teams_personal",
+                               must_answer=True)
+        with patch.dict(os.environ, gateway, clear=True):
+            instructions = bridge_instructions(request)
+        self.assertIn("budget-season-fy2027", instructions)
+        self.assertIn("A claim is not a decision", instructions)
+        self.assertIn("Agent User Teams collaboration is enabled", instructions)
+        self.assertIn("Agent User Office collaboration is enabled", instructions)
+        with patch.dict(os.environ, gateway_environment(plain), clear=True):
+            self.assertNotIn("budget-season-fy2027", bridge_instructions(request))
+
+    def test_budget_profile_runtime_settings_stay_out_of_compute_environment(self):
+        runtime = SimpleNamespace(sandbox_id="runtime-1", endpoint_url="https://runtime.example",
+                                  reused_existing_sandbox=False)
+        settings = {"AZURE_SUBSCRIPTION_ID": "sub", "AZURE_RESOURCE_GROUP": "rg", "AZURE_SANDBOX_GROUP": "runtime",
+                    "AZURE_REGION": "swedencentral", "API_SERVER_KEY": "key", "AGENT_RUNTIME_DISK_IMAGE_ID": "disk",
+                    "WORKER_ASSIGNMENT_PROFILE": "budget-season"}
+        with (
+            patch("scripts.sandbox_services.deploy_agent_sandbox", return_value=runtime) as deploy,
+            patch("scripts.sandbox_services.require_runtime_ready", return_value=1.0),
+            patch("scripts.sandbox_services.require_service_health"),
+            patch("scripts.sandbox_services.write_service_settings") as write,
+            patch("scripts.sandbox_services.SandboxGroupClient") as group_factory,
+        ):
+            group = group_factory.return_value.__enter__.return_value
+            group.get_sandbox_client.return_value.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+            deploy_runtime(settings, "https://gateway.example", "credential")
+        compute = deploy.call_args.args[0].environment
+        service = write.call_args.args[1]["environment"]
+        for key, value in {"HERMES_SKILL_WRITE_APPROVAL": "true", "PRIVATE_MCP_SERVER_NAME": "budget-planning",
+                           "HERMES_DISABLED_MCP_SERVERS": "public-shipments"}.items():
+            self.assertNotIn(key, compute)
+            self.assertEqual(service[key], value)
+
+    def test_gateway_receives_messaging_settings_and_no_runtime_provisioning(self):
+        settings = worker_settings(
+            self.config(),
+            {"foundry_openai_base_url": "https://foundry/openai/v1", "model_deployment_name": "model",
+             "acr_name": "registry", "scheduler_servicebus_fully_qualified_namespace": "schedule.servicebus.windows.net",
+             "application_insights_connection_string": "instrumentation-identifier",
+             "foundry_project_endpoint": "https://foundry/api/projects/project"},
+            self.infrastructure(),
+            {"private_mcp_url": "https://private/mcp", "public_shipments_mcp_url": "https://public/mcp",
+             "runtime_disk_image_id": "runtime-disk"},
+        )
+        self.assertEqual(settings["AZURE_SANDBOX_GROUP"], "worker-runtime")
+        self.assertEqual(settings["AGENT_RUNTIME_MANAGED_IDENTITY_CLIENT_ID"], "runtime-client")
+        self.assertEqual(settings["AGENT_RUNTIME_DISK_IMAGE_ID"], "runtime-disk")
+        self.assertNotIn("RUNTIME_CONFIG_REVISION", settings)
+        env = gateway_environment(settings)
+        for runtime_only in ("AZURE_SANDBOX_GROUP", "AZURE_REGION", "AGENT_RUNTIME_MANAGED_IDENTITY_CLIENT_ID",
+                             "AGENT_RUNTIME_DISK_IMAGE_ID", "AGENT_RUNTIME_IMAGE", "PREVIOUS_API_SERVER_KEY",
+                             "FOUNDRY_OPENAI_BASE_URL", "PRIVATE_INCIDENTS_MCP_URL"):
+            self.assertNotIn(runtime_only, env)
+        self.assertFalse(any(key.startswith("WORKIQ_") for key in env))
+        self.assertEqual(env["GENERATED_APPS_SANDBOX_GROUP"], "worker-generated-apps")
+        self.assertEqual(env["AZURE_CLIENT_ID"], "gateway-client")
+        self.assertEqual(env["WORKER_OWNER_ID"], "owner-object")
+        self.assertNotIn("ACR_NAME", env)
+        self.assertNotIn("AGENT_RUNTIME_REGISTRY_IDENTITY_RESOURCE_ID", env)
+        self.assertEqual(env["CONNECTIONS__SERVICE_CONNECTION__SETTINGS__AUTHTYPE"], "FederatedCredentials")
+        self.assertEqual(env["CONNECTIONS__SERVICE_CONNECTION__SETTINGS__FEDERATEDCLIENTID"], "gateway-client")
+        self.assertEqual(env["AGENT365_BLUEPRINT_CLIENT_ID"], "existing-blueprint")
+        self.assertEqual(env["APPLICATIONINSIGHTS_CONNECTION_STRING"], "instrumentation-identifier")
+        self.assertEqual(env["FOUNDRY_AGENT_NAME"], "autopilots-hermes")
+        self.assertEqual(env["OTEL_CONTAINER_IMAGE"], PYTHON_BASE_IMAGE)
+        self.assertEqual(env["OTEL_SERVICE_VERSION"], PYTHON_BASE_IMAGE.split("@")[-1])
+        self.assertEqual(env["SERVICEBUS_DREAM_ENABLED"], "true")
+        self.assertEqual(env["SERVICEBUS_DREAM_CRON_EXPRESSION"], "15 3 * * *")
+        self.assertEqual(env["SCHEDULED_LEARNING_FOCUS"], "review delivery handoffs")
+        self.assertEqual(env["SCHEDULED_LEARNING_MAX_RECORDS"], "2")
+        self.assertEqual(env["SCHEDULED_LEARNING_PREPARE_PACKET"], "false")
+        self.assertFalse(any("CLIENTSECRET" in key or "REGISTRY_PASSWORD" in key for key in env))
+
+    def test_toolbox_guidance_follows_gateway_settings_without_changing_runtime(self):
+        platform = {
+            "foundry_openai_base_url": "https://foundry/openai/v1", "model_deployment_name": "model",
+            "acr_name": "registry", "scheduler_servicebus_fully_qualified_namespace": "schedule.servicebus.windows.net",
+            "application_insights_connection_string": "instrumentation-identifier",
+            "foundry_project_endpoint": "https://foundry/api/projects/project",
+        }
+        endpoints = {
+            "private_mcp_url": "https://private/mcp", "public_shipments_mcp_url": "https://public/mcp",
+            "runtime_disk_image_id": "runtime-disk",
+        }
+        for toolbox_url in ("", "https://foundry.example/toolbox/mcp"):
+            with self.subTest(toolbox_url=toolbox_url), patch.dict(os.environ, {}, clear=True):
+                settings = worker_settings(
+                    {**self.config(), "foundry_toolbox_mcp_url": toolbox_url},
+                    platform, self.infrastructure(), endpoints,
+                )
+                gateway = gateway_environment(settings)
+                self.assertEqual(gateway["FOUNDRY_TOOLBOX_ENABLED"], str(bool(toolbox_url)).lower())
+                self.assertNotIn("FOUNDRY_TOOLBOX_MCP_UPSTREAM_URL", gateway)
+                self.assertNotIn("FOUNDRY_TOOLBOX_MCP_URL", gateway)
+                runtime = config_from_environment(settings)
+                without_flag = config_from_environment(
+                    {key: value for key, value in settings.items() if key != "FOUNDRY_TOOLBOX_ENABLED"}
+                )
+                self.assertNotIn("FOUNDRY_TOOLBOX_ENABLED", runtime.environment)
+                self.assertEqual(runtime.environment, without_flag.environment)
+                self.assertEqual(runtime.runtime_config_revision, without_flag.runtime_config_revision)
+                for source in ("invoke", "teams_personal"):
+                    request = AgentRequest(
+                        prompt="Research.", conversation_id="conversation", user_id="user",
+                        source=source, must_answer=True,
+                    )
+                    with patch.dict(os.environ, gateway, clear=True):
+                        instructions = bridge_instructions(request)
+                        calls = []
+
+                        def handler(native_request):
+                            calls.append(native_request)
+                            if native_request.method == "POST":
+                                return httpx.Response(202, json={"run_id": "run-test"})
+                            return httpx.Response(200, json={
+                                "run_id": "run-test", "status": "completed", "output": "Answer.",
+                            })
+
+                        adapter = HermesRuntimeAdapter(
+                            client_factory=lambda **kwargs: httpx.AsyncClient(
+                                transport=httpx.MockTransport(handler), **kwargs,
+                            ),
+                        )
+                        with (
+                            patch.object(adapter, "_resolve_transcript_id", new=AsyncMock(return_value="session-test")),
+                            patch.object(adapter, "_ensure_session", new=AsyncMock()),
+                        ):
+                            asyncio.run(adapter._native_run("https://runtime.example", "test-key", request))
+                        posts = [call for call in calls if call.method == "POST"]
+                        self.assertEqual(len(posts), 1)
+                        self.assertEqual(posts[0].url.path, "/v1/runs")
+                        self.assertEqual(json.loads(posts[0].content)["instructions"], instructions)
+                    self.assertEqual(instructions.count("403 AuthContentFormatForbidden"), int(bool(toolbox_url)))
+
+    def test_runtime_telemetry_uses_runtime_image_not_gateway_image(self):
+        config = AgentSandboxConfig("sub", "rg", "group", "region", "registry/runtime:build123",
+                                    runtime_image_reference="registry/runtime@sha256:123")
+        with patch.dict(os.environ, {"APPLICATIONINSIGHTS_CONNECTION_STRING": "operator-shell"}, clear=True):
+            environment = runtime_telemetry_environment(config, {
+                "APPLICATIONINSIGHTS_CONNECTION_STRING": "instrumentation-identifier",
+                "FOUNDRY_AGENT_NAME": "autopilots-hermes",
+                "OTEL_CONTAINER_IMAGE": "registry/bridge@sha256:abc",
+                "OTEL_SERVICE_VERSION": "sha256:abc",
+            })
+        self.assertEqual(environment["APPLICATIONINSIGHTS_CONNECTION_STRING"], "instrumentation-identifier")
+        self.assertEqual(environment["FOUNDRY_AGENT_NAME"], "autopilots-hermes")
+        self.assertEqual(environment["OTEL_CONTAINER_IMAGE"], "registry/runtime@sha256:123")
+        self.assertEqual(environment["OTEL_SERVICE_VERSION"], "sha256:123")
+
+    def test_runtime_environment_uses_prepared_disk_and_digest_not_conversion_source(self):
+        values = {
+            "AGENT_RUNTIME_IMAGE": "registry/runtime@sha256:123",
+            "AGENT_RUNTIME_DISK_SOURCE_IMAGE": "registry/runtime:build123",
+            "AGENT_RUNTIME_DISK_IMAGE_ID": "runtime-disk",
+        }
+        config = config_from_environment(
+            values, subscription_id="sub", resource_group="rg", sandbox_group="group", region="region",
+            api_server_key="runtime-test-key",
+        )
+        self.assertEqual(config.image_name, "registry/runtime@sha256:123")
+        self.assertEqual(config.disk_image_id, "runtime-disk")
+        self.assertEqual(config.runtime_image_reference, "registry/runtime@sha256:123")
+        self.assertEqual(config.environment["OTEL_CONTAINER_IMAGE"], "registry/runtime@sha256:123")
+
+    def test_private_ingress_must_be_disabled_before_deploy(self):
+        infra = self.infrastructure()
+        infra.update({"deployment_config": self.config(), "private_ingress": {"publicNetworkAccess": "Enabled"}})
+        with self.assertRaisesRegex(RuntimeError, "disabled public ingress"):
+            deploy_sandbox_services(infra, {})
+
+    def test_runtime_is_deployed_with_gateway_url_and_verified_through_ondemand_ingress(self):
+        runtime = SimpleNamespace(sandbox_id="runtime-1", endpoint_url="https://runtime.example",
+                                  reused_existing_sandbox=False)
+        settings = {"AZURE_SUBSCRIPTION_ID": "sub", "AZURE_RESOURCE_GROUP": "rg", "AZURE_SANDBOX_GROUP": "runtime",
+                    "AZURE_REGION": "swedencentral", "API_SERVER_KEY": "key", "AGENT_RUNTIME_DISK_IMAGE_ID": "disk"}
+        with (
+            patch("scripts.sandbox_services.deploy_agent_sandbox", return_value=runtime) as deploy,
+            patch("scripts.sandbox_services.require_runtime_ready", return_value=9.5) as ready,
+            patch("scripts.sandbox_services.require_service_health"),
+            patch("scripts.sandbox_services.SandboxGroupClient") as group_factory,
+        ):
+            group = group_factory.return_value.__enter__.return_value
+            group.get_sandbox_client.return_value.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+            result = deploy_runtime(settings, "https://gateway.example", "credential")
+        config = deploy.call_args.args[0]
+        self.assertEqual(config.environment["AUTOPILOT_BRIDGE_URL"], "https://gateway.example")
+        self.assertEqual(deploy.call_args.kwargs, {"credential": "credential"})
+        ready.assert_called_once_with("https://runtime.example")
+        self.assertEqual(result, {
+            "runtime_url": "https://runtime.example", "runtime_sandbox_id": "runtime-1",
+            "runtime_application_release": self.release.digest,
+        })
+
+    def test_exited_runtime_supervisor_is_relaunched_before_quiescence_check(self):
+        runtime = SimpleNamespace(sandbox_id="runtime-1", endpoint_url="https://runtime.example",
+                                  reused_existing_sandbox=True)
+        settings = {"AZURE_SUBSCRIPTION_ID": "sub", "AZURE_RESOURCE_GROUP": "rg", "AZURE_SANDBOX_GROUP": "runtime",
+                    "AZURE_REGION": "swedencentral", "API_SERVER_KEY": "key", "AGENT_RUNTIME_DISK_IMAGE_ID": "disk"}
+        events = []
+        with (
+            patch("scripts.sandbox_services.deploy_agent_sandbox", return_value=runtime),
+            patch("scripts.sandbox_services.require_runtime_ready", return_value=1.0),
+            patch("scripts.sandbox_services.repair_service_supervisor",
+                  side_effect=lambda _: events.append("repair") or "old-release"),
+            patch("scripts.sandbox_services.require_service_health",
+                  side_effect=lambda _s, _p, release="": events.append(("health", release))),
+            patch("scripts.sandbox_services.require_quiescent_service",
+                  side_effect=lambda *_: events.append("quiescent")),
+            patch("scripts.sandbox_services.SandboxGroupClient") as group_factory,
+        ):
+            sandbox = group_factory.return_value.__enter__.return_value.get_sandbox_client.return_value
+            sandbox.read_file.return_value = json.dumps({"release": "old-release", "environment": {}})
+            sandbox.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+            deploy_runtime(settings, "https://gateway.example", "credential")
+        self.assertEqual(events[:3], ["repair", ("health", "old-release"), "quiescent"])
+        self.assertEqual(events[-1], ("health", self.release.digest))
+
+    def test_gateway_settings_receive_runtime_url_derived_from_gateway_url(self):
+        service = SandboxService("gateway", "image@sha256:123", 8000, ("python3",), {}, release=self.release)
+        client = Mock()
+        client.list_volumes.return_value = []
+        client._group_path = "/group"
+        client._dp_get.return_value = []
+        client._dp_put.return_value = {"id": "sandbox"}
+        sandbox = client.get_sandbox_client.return_value
+        sandbox.sandbox_id = "sandbox"
+        sandbox.get.return_value = SimpleNamespace(ports=[SimpleNamespace(port=8000, url="https://gateway.example/")])
+        sandbox.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+        seen = []
+
+        def endpoint_environment(url):
+            seen.append(url)
+            return {"AGENT_RUNTIME_URL": "https://runtime.example"}
+
+        with patch("scripts.sandbox_services.require_service_health"):
+            deploy_service(client, service, self.group(), "worker", disk_image_id="disk",
+                           endpoint_environment=endpoint_environment)
+        written = json.loads(sandbox.write_file.call_args.args[1])["environment"]
+        self.assertEqual(seen, ["https://gateway.example"])
+        self.assertEqual(written["AGENT_RUNTIME_URL"], "https://runtime.example")
+        self.assertEqual(written["AUTOPILOT_BRIDGE_URL"], "https://gateway.example")
+
+    def test_native_url_supplied_before_gateway_process_starts(self):
+        service = SandboxService("gateway", "image@sha256:123", 8000, ("python3", "-m", "server"), {}, False,
+                                 disk_source_image="image:build123", release=self.release)
+        client = Mock()
+        client.list_volumes.return_value = []
+        client._group_path = "/group"
+        client._dp_get.return_value = []
+        client.list_disk_images.return_value = []
+        client.begin_create_disk_image.return_value.result.return_value = SimpleNamespace(id="disk")
+        client._dp_put.return_value = {"id": "sandbox"}
+        sandbox = client.get_sandbox_client.return_value
+        sandbox.sandbox_id = "sandbox"
+        sandbox.get.return_value = SimpleNamespace(ports=[SimpleNamespace(port=8000, url="https://native.adcproxy.io")])
+        sandbox.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+        with patch("scripts.sandbox_services.require_service_health") as health:
+            result = deploy_service(client, service, self.group(), "worker", disk_image_id="disk")
+        written_path, written = sandbox.write_file.call_args.args
+        self.assertEqual(written_path, SERVICE_CONFIG_PATH + ".next")
+        self.assertEqual(json.loads(written)["environment"]["AUTOPILOT_BRIDGE_URL"], result["url"])
+        client.begin_create_disk_image.assert_not_called()
+        self.assertEqual(client._dp_put.call_args.args[1]["sourcesRef"]["diskImage"]["id"], "disk")
+        self.assertEqual(result["image"], "image@sha256:123")
+        health.assert_called_once_with(sandbox, 8000, self.release.digest)
+
+    def test_failed_configuration_update_restores_previous_settings(self):
+        service = SandboxService("gateway", "image", 8000, ("python3",), {"RELEASE": "new"}, release=self.release)
+        client = Mock()
+        client.list_volumes.return_value = []
+        client._group_path = "/group"
+        client._dp_get.return_value = [{
+            "id": "sandbox", "labels": service_body(service, self.group(), "disk", "worker")["labels"],
+        }]
+        sandbox = client.get_sandbox_client.return_value
+        sandbox.get.return_value = SimpleNamespace(
+            state="Running", ports=[SimpleNamespace(port=8000, url="https://native.adcproxy.io")]
+        )
+        sandbox.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+        previous = {
+            "environment": {"RELEASE": "old", "TRANSPORT_CONNECTION_ID": "/connections/gateway"},
+            "command": ["python3"],
+        }
+        sandbox.read_file.return_value = json.dumps(previous)
+        with patch("scripts.sandbox_services.require_service_health", side_effect=TimeoutError("unhealthy")):
+            with self.assertRaisesRegex(TimeoutError, "unhealthy"):
+                deploy_service(client, service, self.group(), "worker", disk_image_id="disk")
+        self.assertEqual(json.loads(sandbox.write_file.call_args.args[1]), previous)
+        sandbox.begin_stop.assert_not_called()
+        sandbox.begin_delete.assert_not_called()
+
+    def test_maintenance_release_wakes_service_and_keeps_the_original_failure(self):
+        from azure.core.exceptions import AzureError
+
+        service = SandboxService("gateway", "image", 8000, ("python3",), {}, release=self.release)
+        client = Mock()
+        client.list_volumes.return_value = []
+        client._group_path = "/group"
+        client._dp_get.return_value = [{
+            "id": "sandbox", "labels": service_body(service, self.group(), "disk", "worker")["labels"],
+        }]
+        sandbox = client.get_sandbox_client.return_value
+        sandbox.get.return_value = SimpleNamespace(
+            state="Running", ports=[SimpleNamespace(port=8000, url="https://native.adcproxy.io")]
+        )
+        sandbox.read_file.return_value = json.dumps({"environment": {}, "command": ["python3"]})
+        events = []
+        sandbox.ensure_running.side_effect = lambda **_: events.append("wake")
+
+        def execute(command):
+            if "Maintenance belongs" in command:
+                events.append("release")
+                raise AzureError("Sandbox is not in Running state")
+            return SimpleNamespace(exit_code=0, stderr="")
+
+        sandbox.exec.side_effect = execute
+
+        def runtime_failure(_url):
+            raise RuntimeError("runtime release failed")
+
+        with self.assertRaisesRegex(RuntimeError, "runtime release failed") as raised:
+            deploy_service(client, service, self.group(), "worker", disk_image_id="disk",
+                           endpoint_environment=runtime_failure)
+        self.assertEqual(events[-2:], ["wake", "release"])
+        self.assertTrue(any("Leaving application maintenance failed" in note
+                            for note in getattr(raised.exception, "__notes__", [])))
+
+    def test_changed_bootstrap_replaces_stopped_service_without_stopping_it_again(self):
+        service = SandboxService("private-mcp", "image", 8765, ("python3",), {}, release=self.release)
+        client = Mock()
+        client._group_path = "/group"
+        client._dp_get.return_value = [{
+            "id": "old", "labels": {"worker": "worker", "service": "private-mcp",
+                                  "image": hashlib.sha256(b"image").hexdigest()[:32]},
+        }]
+        old, new = Mock(), Mock()
+        old.get.return_value = SimpleNamespace(state="Stopped")
+        new.sandbox_id = "new"
+        new.get.return_value = SimpleNamespace(ports=[SimpleNamespace(port=8765, url="https://native.adcproxy.io")])
+        new.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+        client.get_sandbox_client.side_effect = lambda identifier: old if identifier == "old" else new
+        client._dp_put.return_value = {"id": "new"}
+        with patch("scripts.sandbox_services.require_service_health"):
+            result = deploy_service(client, service, self.group("private-mcp"), "worker", disk_image_id="disk")
+        self.assertEqual(result["sandbox_id"], "new")
+        old.begin_stop.assert_not_called()
+        old.begin_delete.assert_not_called()
+        self.assertEqual(result["superseded_sandbox_ids"], ["old"])
+        self.assertIn("deployment", client._dp_put.call_args.args[1]["labels"])
+
+    def test_failed_service_is_replaced_even_when_deployment_labels_match(self):
+        for matching_labels in (True, False):
+            for healthy_replacement in (True, False):
+                with self.subTest(matching_labels=matching_labels, healthy_replacement=healthy_replacement):
+                    service = SandboxService("private-mcp", "image", 8765, ("python3",), {}, release=self.release)
+                    client = Mock()
+                    client._group_path = "/group"
+                    labels = service_body(service, self.group("private-mcp"), "disk", "worker")["labels"]
+                    if not matching_labels:
+                        labels["deployment"] = "previous-release"
+                    client._dp_get.return_value = [{"id": "failed", "labels": labels}]
+                    old, new = Mock(), Mock()
+                    old.get.return_value = SimpleNamespace(state="Failed")
+                    new.sandbox_id = "replacement"
+                    new.get.return_value = SimpleNamespace(
+                        state="Running", ports=[SimpleNamespace(port=8765, url="https://native.adcproxy.io")]
+                    )
+                    new.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+                    client.get_sandbox_client.side_effect = lambda identifier: old if identifier == "failed" else new
+                    client._dp_put.return_value = {"id": "replacement"}
+                    with patch("scripts.sandbox_services.require_service_health") as health:
+                        if not healthy_replacement:
+                            health.side_effect = TimeoutError("unhealthy")
+                            with self.assertRaisesRegex(TimeoutError, "unhealthy"):
+                                deploy_service(client, service, self.group("private-mcp"), "worker", disk_image_id="disk")
+                            old.begin_delete.assert_not_called()
+                            new.begin_delete.assert_called_once()
+                        else:
+                            result = deploy_service(
+                                client, service, self.group("private-mcp"), "worker", disk_image_id="disk"
+                            )
+                            self.assertEqual(result["sandbox_id"], "replacement")
+                            old.begin_delete.assert_not_called()
+                            self.assertEqual(result["superseded_sandbox_ids"], ["failed"])
+                            new.begin_delete.assert_not_called()
+                    client._dp_put.assert_called_once()
+                    old.ensure_running.assert_not_called()
+                    old.begin_stop.assert_not_called()
+
+    def test_current_stopped_or_suspended_service_resumes_without_replacement(self):
+        for state in ("Stopped", "Suspended"):
+            with self.subTest(state=state):
+                service = SandboxService("private-mcp", "image", 8765, ("python3",), {}, release=self.release)
+                client = Mock()
+                client._group_path = "/group"
+                client._dp_get.return_value = [{
+                    "id": "existing",
+                    "labels": service_body(service, self.group("private-mcp"), "disk", "worker")["labels"],
+                }]
+                sandbox = client.get_sandbox_client.return_value
+                sandbox.sandbox_id = "existing"
+                sandbox.get.return_value = SimpleNamespace(
+                    state=state, ports=[SimpleNamespace(port=8765, url="https://native.adcproxy.io")]
+                )
+                sandbox.read_file.return_value = json.dumps({
+                    "environment": {
+                        "APPLICATION_RELEASE": self.release.digest,
+                        "OTEL_SERVICE_VERSION": self.release.digest,
+                    },
+                    "command": [self.release.directory + "/.venv/bin/python"],
+                    "workingDirectory": self.release.directory,
+                    "release": self.release.digest,
+                })
+                sandbox.exec.return_value = SimpleNamespace(exit_code=0, stderr="")
+                with patch("scripts.sandbox_services.require_service_health"):
+                    result = deploy_service(client, service, self.group("private-mcp"), "worker", disk_image_id="disk")
+                self.assertEqual(result["sandbox_id"], "existing")
+                sandbox.ensure_running.assert_called_once_with(timeout=600)
+                sandbox.begin_stop.assert_not_called()
+                sandbox.begin_delete.assert_not_called()
+                sandbox.write_file.assert_not_called()
+                client._dp_put.assert_not_called()
+
+    def test_conversion_uses_group_managed_identity_without_registry_credentials(self):
+        client = Mock()
+        client._endpoint = "https://adc"
+        client._group_path = "/groups/runtime"
+        client.list_disk_images.return_value = []
+        client._send_request.return_value.json.side_effect = [
+            {"operationId": "op-1"},
+            {"status": "Running"},
+            {"status": "Succeeded", "diskImage": {"id": "disk"}},
+        ]
+        client.get_disk_image.return_value = SimpleNamespace(id="disk", status=SimpleNamespace(state="Ready"))
+        with (
+            patch("scripts.sandbox_services.run_text", return_value="sha256:123") as run,
+            patch("scripts.sandbox_services.time.sleep"),
+        ):
+            result = prepare_disk_image(
+                client, role="runtime", image="registry.azurecr.io/runtime@sha256:123",
+                source="registry.azurecr.io/runtime:build123", acr_name="registry", subscription_id="sub",
+                identity_client_id="runtime-client",
+            )
+        self.assertEqual(result, "disk")
+        self.assertEqual(run.call_count, 1)
+        self.assertNotIn("--expose-token", run.call_args.args[0])
+        requests = [call.args[0] for call in client._send_request.call_args_list]
+        self.assertEqual((requests[0].method, requests[0].url), ("PUT", "https://adc/groups/runtime/diskimages/v2/async"))
+        name = "runtime-" + hashlib.sha256(b"registry.azurecr.io/runtime@sha256:123").hexdigest()[:20]
+        self.assertEqual(json.loads(requests[0].content), {
+            "source": {"kind": "registry", "imageUrl": "registry.azurecr.io/runtime:build123",
+                       "managedIdentityClientId": "runtime-client"},
+            "labels": {"name": name},
+        })
+        self.assertEqual(requests[1].url, "https://adc/groups/runtime/diskimages/operations/op-1")
+        self.assertTrue(all("api-version" not in request.url for request in requests))
+        client.begin_create_disk_image.assert_not_called()
+
+    def test_failed_conversion_reports_service_error(self):
+        client = Mock()
+        client._endpoint = "https://adc"
+        client._group_path = "/groups/runtime"
+        client._send_request.return_value.json.side_effect = [
+            {"operationId": "op-1"},
+            {"status": "Failed", "errorMessage": "UNAUTHORIZED: authentication required"},
+        ]
+        with self.assertRaisesRegex(RuntimeError, "UNAUTHORIZED.*AcrPull"):
+            convert_disk_image(client, {"source": {}})
+
+    def test_existing_ready_disk_needs_no_registry_access(self):
+        client = Mock()
+        image = "registry.azurecr.io/runtime@sha256:123"
+        name = "runtime-" + hashlib.sha256(image.encode()).hexdigest()[:20]
+        client.list_disk_images.return_value = [
+            SimpleNamespace(id="disk", name=name, status=SimpleNamespace(state="Ready"))
+        ]
+        with patch("scripts.sandbox_services.run_text") as run:
+            result = prepare_disk_image(
+                client, role="runtime", image=image, source="registry.azurecr.io/runtime:build123",
+                acr_name="registry", subscription_id="sub", identity_client_id="runtime-client",
+            )
+        self.assertEqual(result, "disk")
+        run.assert_not_called()
+        client._send_request.assert_not_called()
+
+    def test_conversion_rejects_retagged_source_before_converting(self):
+        client = Mock()
+        client.list_disk_images.return_value = []
+        with patch("scripts.sandbox_services.run_text", return_value="sha256:unexpected") as run:
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                prepare_disk_image(
+                    client, role="runtime", image="registry.azurecr.io/runtime@sha256:123",
+                    source="registry.azurecr.io/runtime:build123", acr_name="registry", subscription_id="sub",
+                    identity_client_id="runtime-client",
+                )
+        self.assertEqual(run.call_count, 1)
+        client._send_request.assert_not_called()
+
+    def test_missing_runtime_disk_fails_before_lifecycle_changes(self):
+        config = AgentSandboxConfig("sub", "rg", "group", "region", "image")
+        with patch("scripts.sandbox_runtime.create_sandbox_group_client") as create:
+            from scripts.sandbox_runtime import deploy_agent_sandbox
+
+            with self.assertRaisesRegex(ValueError, "AGENT_RUNTIME_DISK_IMAGE_ID"):
+                deploy_agent_sandbox(config)
+        create.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

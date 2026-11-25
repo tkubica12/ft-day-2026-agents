@@ -1,0 +1,168 @@
+<svg width="740" height="504" viewBox="0 0 740 504" role="img" aria-labelledby="pareto-title" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title id="pareto-title">Artificial Analysis: Intelligence Index vs. Cost per Task (Pareto Optimal Frontier)</title>
+  <rect x="1" y="1" width="738" height="502" rx="12" fill="#191919" stroke="#363636" stroke-width="1.2"/>
+  <text x="18" y="24" fill="#f2f2f2" font-size="14" font-weight="650">Artificial Analysis · Intelligence Index v5.0.2 vs. Cost per Task</text>
+  <text x="722" y="24" text-anchor="end" fill="#a0a0a0" font-size="11">25. 11. 2026 · Log X</text>
+  <text x="64.0" y="55.0" fill="#00a4ef" font-size="11" font-weight="630" opacity="0.92">↖ Vyšší kvalita, nižší cena (Pareto optimum)</text>
+  <line x1="54.0" y1="397.3" x2="720.0" y2="397.3" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="401.3" text-anchor="end" fill="#b5b5b5" font-size="11">15</text>
+  <line x1="54.0" y1="330.1" x2="720.0" y2="330.1" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="334.1" text-anchor="end" fill="#b5b5b5" font-size="11">25</text>
+  <line x1="54.0" y1="263.0" x2="720.0" y2="263.0" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="267.0" text-anchor="end" fill="#b5b5b5" font-size="11">35</text>
+  <line x1="54.0" y1="195.8" x2="720.0" y2="195.8" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="199.8" text-anchor="end" fill="#b5b5b5" font-size="11">45</text>
+  <line x1="54.0" y1="128.7" x2="720.0" y2="128.7" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="132.7" text-anchor="end" fill="#b5b5b5" font-size="11">55</text>
+  <line x1="54.0" y1="61.5" x2="720.0" y2="61.5" stroke="#363636" stroke-width="1" opacity="0.72"/>
+  <text x="46.0" y="65.5" text-anchor="end" fill="#b5b5b5" font-size="11">65</text>
+  <line x1="101.0" y1="38.0" x2="101.0" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="101.0" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$0.05</text>
+  <line x1="164.7" y1="38.0" x2="164.7" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="164.7" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$0.10</text>
+  <line x1="248.9" y1="38.0" x2="248.9" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="248.9" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$0.25</text>
+  <line x1="312.7" y1="38.0" x2="312.7" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="312.7" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$0.50</text>
+  <line x1="376.4" y1="38.0" x2="376.4" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="376.4" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$1</text>
+  <line x1="440.1" y1="38.0" x2="440.1" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="440.1" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$2</text>
+  <line x1="524.3" y1="38.0" x2="524.3" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="524.3" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$5</text>
+  <line x1="588.1" y1="38.0" x2="588.1" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="588.1" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$10</text>
+  <line x1="672.3" y1="38.0" x2="672.3" y2="404.0" stroke="#363636" stroke-width="1" opacity="0.65"/>
+  <text x="672.3" y="421.0" text-anchor="middle" fill="#b5b5b5" font-size="11">$25</text>
+  <line x1="54.0" y1="38.0" x2="54.0" y2="404.0" stroke="#595959" stroke-width="1.2"/>
+  <line x1="54.0" y1="404.0" x2="720.0" y2="404.0" stroke="#595959" stroke-width="1.2"/>
+  <text x="387.0" y="438.0" text-anchor="middle" fill="#b5b5b5" font-size="12" font-weight="600">Cena za úlohu — Cost per Task (USD, logaritmická osa)</text>
+  <text x="16" y="221.0" text-anchor="middle" fill="#b5b5b5" font-size="12" font-weight="600" transform="rotate(-90 16 221.0)">Intelligence Index</text>
+  <path d="M 85.4 374.1 L 156.8 332.8 L 192.9 255.6 L 212.8 242.1 L 293.5 146.0 L 377.7 113.5 L 503.8 80.4 L 677.8 63.1" fill="none" stroke="#00a4ef" stroke-width="2.4" stroke-dasharray="6 4" opacity="0.92"/>
+  <!-- Reasoning range connectors (med -> max/xhigh) -->
+  <line x1="85.4" y1="374.1" x2="203.2" y2="311.0" stroke="#f2f2f2" stroke-width="1.5" opacity="0.5"/>
+  <line x1="212.8" y1="242.1" x2="372.7" y2="152.9" stroke="#f2f2f2" stroke-width="1.5" opacity="0.5"/>
+  <line x1="293.5" y1="146.0" x2="377.7" y2="113.5" stroke="#f2f2f2" stroke-width="1.5" opacity="0.5"/>
+  <line x1="420.6" y1="114.9" x2="503.8" y2="80.4" stroke="#f2f2f2" stroke-width="1.5" opacity="0.5"/>
+  <line x1="156.8" y1="332.8" x2="294.6" y2="252.7" stroke="#d4633f" stroke-width="1.5" opacity="0.5"/>
+  <line x1="353.6" y1="290.7" x2="588.3" y2="130.5" stroke="#d4633f" stroke-width="1.5" opacity="0.5"/>
+  <line x1="458.8" y1="173.9" x2="588.4" y2="101.0" stroke="#d4633f" stroke-width="1.5" opacity="0.5"/>
+  <line x1="499.2" y1="119.8" x2="677.8" y2="63.1" stroke="#d4633f" stroke-width="1.5" opacity="0.5"/>
+  <line x1="355.6" y1="221.8" x2="482.2" y2="134.9" stroke="#169c52" stroke-width="1.5" opacity="0.5"/>
+  <line x1="549.7" y1="106.1" x2="564.7" y2="94.2" stroke="#169c52" stroke-width="1.5" opacity="0.5"/>
+  <line x1="435.6" y1="129.2" x2="547.7" y2="84.7" stroke="#169c52" stroke-width="1.5" opacity="0.5"/>
+  <line x1="475.0" y1="288.9" x2="564.9" y2="260.5" stroke="#7c6be6" stroke-width="1.5" opacity="0.5"/>
+  <line x1="408.1" y1="343.0" x2="442.9" y2="322.6" stroke="#e11d48" stroke-width="1.5" opacity="0.5"/>
+  <!-- Leader lines -->
+  <line x1="588.4" y1="101.0" x2="608.4" y2="110.5" stroke="#d4633f" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.68"/>
+  <line x1="482.2" y1="134.9" x2="497.2" y2="153.4" stroke="#169c52" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.68"/>
+  <line x1="564.7" y1="94.2" x2="608.7" y2="94.7" stroke="#169c52" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.68"/>
+  <line x1="547.7" y1="84.7" x2="601.7" y2="79.2" stroke="#169c52" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.68"/>
+  <line x1="428.8" y1="343.1" x2="437.8" y2="355.6" stroke="#2563eb" stroke-width="1.0" stroke-dasharray="2 2" opacity="0.68"/>
+  <!-- Data points -->
+  <circle cx="203.2" cy="311.0" r="4.8" fill="#f2f2f2" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="372.7" cy="152.9" r="4.8" fill="#f2f2f2" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="420.6" cy="114.9" r="3.7" fill="#f2f2f2" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="294.6" cy="252.7" r="4.8" fill="#d4633f" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="353.6" cy="290.7" r="3.7" fill="#d4633f" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="588.3" cy="130.5" r="4.8" fill="#d4633f" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="458.8" cy="173.9" r="3.7" fill="#d4633f" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="588.4" cy="101.0" r="4.8" fill="#d4633f" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="499.2" cy="119.8" r="3.7" fill="#d4633f" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="355.6" cy="221.8" r="3.7" fill="#169c52" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="482.2" cy="134.9" r="4.8" fill="#169c52" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="549.7" cy="106.1" r="3.7" fill="#169c52" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="564.7" cy="94.2" r="4.8" fill="#169c52" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="435.6" cy="129.2" r="3.7" fill="#169c52" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="547.7" cy="84.7" r="4.8" fill="#169c52" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="475.0" cy="288.9" r="3.7" fill="#7c6be6" fill-opacity="0.74" stroke="#191919" stroke-width="1.3"/>
+  <circle cx="564.9" cy="260.5" r="4.8" fill="#7c6be6" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <polygon points="496.2,179.8 501.8,185.4 496.2,191.0 490.6,185.4" fill="#191919" stroke="#0891b2" stroke-width="2.1"/>
+  <polygon points="329.7,274.8 335.3,280.4 329.7,286.0 324.1,280.4" fill="#191919" stroke="#2563eb" stroke-width="2.1"/>
+  <polygon points="428.8,337.5 434.4,343.1 428.8,348.7 423.2,343.1" fill="#191919" stroke="#2563eb" stroke-width="2.1"/>
+  <polygon points="524.5,280.5 530.1,286.1 524.5,291.7 518.9,286.1" fill="#191919" stroke="#0ea5e9" stroke-width="2.1"/>
+  <polygon points="251.5,291.4 257.1,297.0 251.5,302.6 245.9,297.0" fill="#191919" stroke="#f97316" stroke-width="2.1"/>
+  <polygon points="408.1,338.6 412.5,343.0 408.1,347.4 403.7,343.0" fill="#191919" stroke="#e11d48" stroke-width="2.1"/>
+  <polygon points="442.9,317.0 448.5,322.6 442.9,328.2 437.3,322.6" fill="#191919" stroke="#e11d48" stroke-width="2.1"/>
+  <circle cx="485.2" cy="210.7" r="4.8" fill="#d97706" fill-opacity="0.94" stroke="#191919" stroke-width="1.3"/>
+  <polygon points="324.9,301.2 330.5,306.8 324.9,312.4 319.3,306.8" fill="#191919" stroke="#d97706" stroke-width="2.1"/>
+  <circle cx="85.4" cy="374.1" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="85.4" cy="374.1" r="5.6" fill="#f2f2f2" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="212.8" cy="242.1" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="212.8" cy="242.1" r="5.6" fill="#f2f2f2" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="293.5" cy="146.0" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="293.5" cy="146.0" r="5.6" fill="#f2f2f2" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="377.7" cy="113.5" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="377.7" cy="113.5" r="5.6" fill="#f2f2f2" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="503.8" cy="80.4" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="503.8" cy="80.4" r="5.6" fill="#f2f2f2" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="156.8" cy="332.8" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="156.8" cy="332.8" r="5.6" fill="#d4633f" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="677.8" cy="63.1" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="677.8" cy="63.1" r="5.6" fill="#d4633f" stroke="#191919" stroke-width="1.7"/>
+  <circle cx="192.9" cy="255.6" r="9.0" fill="#00a4ef" opacity="0.17"/>
+  <circle cx="192.9" cy="255.6" r="5.6" fill="#0284c7" stroke="#191919" stroke-width="1.7"/>
+  <!-- Labels -->
+  <text x="96.4" y="388.1" text-anchor="start" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GPT-6 Luna (med)</text>
+  <text x="213.2" y="322.0" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Luna (max)</text>
+  <text x="200.8" y="234.1" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GPT-6.1 Terra (med)</text>
+  <text x="362.7" y="166.9" text-anchor="end" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Terra (max)</text>
+  <text x="281.5" y="148.0" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GPT-6.2 Sol (med)</text>
+  <text x="365.7" y="106.5" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GPT-6.2 Sol (max)</text>
+  <text x="427.6" y="104.9" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Astra (med)</text>
+  <text x="492.8" y="69.4" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GPT-6.2 Astra (max)</text>
+  <text x="145.8" y="329.8" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Haiku 5.5 (med)</text>
+  <text x="303.6" y="256.7" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Haiku (max)</text>
+  <text x="362.6" y="296.7" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Sonnet (med)</text>
+  <text x="599.3" y="135.5" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Sonnet 5.5 (max)</text>
+  <text x="448.8" y="178.9" text-anchor="end" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Opus (med)</text>
+  <text x="611.4" y="114.0" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Opus 5.5 (max)</text>
+  <text x="508.5" y="128.5" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Fable (med)</text>
+  <text x="709.8" y="49.1" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Claude Fable 5.2 (max)</text>
+  <text x="345.6" y="225.8" text-anchor="end" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Hydrogen (med)</text>
+  <text x="500.2" y="156.9" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Gemini 4 Hydrogen (xh)</text>
+  <text x="556.7" y="119.1" text-anchor="start" fill="#a0a0a0" font-size="9.2" font-weight="500" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">med</text>
+  <text x="611.7" y="98.2" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Gemini 4 Carbon (hi)</text>
+  <text x="426.6" y="142.2" text-anchor="end" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Neon (med)</text>
+  <text x="604.7" y="82.7" text-anchor="start" fill="#f2f2f2" font-size="10.2" font-weight="650" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Gemini 4 Neon (xh)</text>
+  <text x="467.0" y="300.9" text-anchor="end" fill="#a0a0a0" font-size="9.2" font-weight="500" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">low</text>
+  <text x="574.9" y="264.5" text-anchor="start" fill="#f2f2f2" font-size="10.2" font-weight="650" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Grok 4.7 (xh)</text>
+  <text x="180.9" y="265.6" text-anchor="end" fill="#f2f2f2" font-size="11.3" font-weight="700" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Muse Ember (max)</text>
+  <text x="506.2" y="189.4" text-anchor="start" fill="#f2f2f2" font-size="10.2" font-weight="650" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Kimi K3.1 Pro</text>
+  <text x="319.7" y="273.4" text-anchor="end" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">DeepSeek V4.1 Flash</text>
+  <text x="440.8" y="359.1" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">DeepSeek V4 Pro</text>
+  <text x="534.5" y="290.1" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">GLM-5.3</text>
+  <text x="247.5" y="287.0" text-anchor="middle" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">MiMo-V2.6-Pro</text>
+  <text x="399.1" y="347.0" text-anchor="end" fill="#a0a0a0" font-size="9.2" font-weight="500" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">med</text>
+  <text x="452.9" y="326.6" text-anchor="start" fill="#f2f2f2" font-size="10.2" font-weight="650" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Mistral Large 4 (EU)</text>
+  <text x="495.2" y="214.7" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Qwen4 Max</text>
+  <text x="334.9" y="317.8" text-anchor="start" fill="#b5b5b5" font-size="10.2" font-weight="570" paint-order="stroke" stroke="#191919" stroke-width="3.6" stroke-linejoin="round">Qwen3.8-Flash</text>
+  <line x1="18" y1="446" x2="722" y2="446" stroke="#363636" stroke-width="1"/>
+  <circle cx="24" cy="460" r="4.4" fill="#f2f2f2"/>
+  <text x="33" y="463.8" fill="#b5b5b5" font-size="10.8">OpenAI</text>
+  <circle cx="92" cy="460" r="4.4" fill="#d4633f"/>
+  <text x="101" y="463.8" fill="#b5b5b5" font-size="10.8">Anthropic</text>
+  <circle cx="174" cy="460" r="4.4" fill="#169c52"/>
+  <text x="183" y="463.8" fill="#b5b5b5" font-size="10.8">Google</text>
+  <circle cx="242" cy="460" r="4.4" fill="#7c6be6"/>
+  <text x="251" y="463.8" fill="#b5b5b5" font-size="10.8">xAI (Grok)</text>
+  <circle cx="326" cy="460" r="4.4" fill="#0284c7"/>
+  <text x="335" y="463.8" fill="#b5b5b5" font-size="10.8">Meta</text>
+  <polygon points="386,455.4 390.6,460 386,464.6 381.4,460" fill="#191919" stroke="#e11d48" stroke-width="1.9"/>
+  <text x="395" y="463.8" fill="#b5b5b5" font-size="10.8">Mistral (EU)</text>
+  <polygon points="480,455.4 484.6,460 480,464.6 475.4,460" fill="#191919" stroke="#2563eb" stroke-width="1.9"/>
+  <text x="489" y="463.8" fill="#b5b5b5" font-size="10.8">Kimi / DeepSeek / GLM</text>
+  <polygon points="632,455.4 636.6,460 632,464.6 627.4,460" fill="#191919" stroke="#f97316" stroke-width="1.9"/>
+  <text x="641" y="463.8" fill="#b5b5b5" font-size="10.8">MiMo / Qwen</text>
+  <line x1="20" y1="484" x2="44" y2="484" stroke="#00a4ef" stroke-width="2.3" stroke-dasharray="5 3"/>
+  <circle cx="32" cy="484" r="4.2" fill="#f2f2f2" stroke="#191919" stroke-width="1.3"/>
+  <text x="51" y="487.8" fill="#f2f2f2" font-size="10.8" font-weight="660">Pareto hranice (tučně)</text>
+  <circle cx="204" cy="484" r="4.4" fill="#b5b5b5"/>
+  <text x="214" y="487.8" fill="#b5b5b5" font-size="10.8">Proprietární</text>
+  <polygon points="300,479.2 304.8,484 300,488.8 295.2,484" fill="#191919" stroke="#b5b5b5" stroke-width="1.9"/>
+  <text x="310" y="487.8" fill="#b5b5b5" font-size="10.8">Open-Weights</text>
+  <circle cx="414" cy="484" r="3.4" fill="#b5b5b5" opacity="0.72"/>
+  <line x1="417" y1="484" x2="441" y2="484" stroke="#b5b5b5" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="443" cy="484" r="4.6" fill="#b5b5b5"/>
+  <text x="453" y="487.8" fill="#b5b5b5" font-size="10.8">Rozpětí reasoningu (med → max / xhigh)</text>
+</svg>

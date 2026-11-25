@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="cs" data-default-theme="dark" data-default-accent="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Od asistenta k autopilotům — Agentská platforma Microsoft</title>
+<meta name="description" content="Dvě strany téže agentské platformy Microsoft: M365 SaaS a Azure Foundry po ukázce Javorna na Microsoft Frontier Day Praha.">
+<meta name="doc-id" content="ft2026-platform-deck">
+
+<!-- 1. Theme bootstrap. Must be the first script in <head>. -->
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"],
+    "print-theme": ["light", "dark"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "print-theme" ? "PDF theme: " + (current === "dark" ? "Dark" : "Light") :
+          name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "print-theme" ? "PDF theme: " + current + ". Switch to " + next :
+          name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name),
+      root.getAttribute(name === "print-theme" ? "data-print-theme" : "data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"], [data-action="toggle-print-theme"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+
+<!-- 2. Canonical design tokens. Copied verbatim from assets/tokens.css. -->
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen theme and print theme are independent; print stays light by default. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+@media print {
+  :root[data-print-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+
+<!-- 3. Shared deck runtime. -->
+<link rel="stylesheet" href="assets/deck.css">
+<script src="assets/deck.js" defer></script>
+<style>
+.figure img.pareto-img { width: 100%; height: auto; border: 0; border-radius: 0; }
+.figure img.pareto-img--dark { display: none; }
+.summary-item--wide { grid-column: 1 / -1; padding: 22px 24px; }
+.summary-item--wide ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.summary-item--wide li { position: relative; padding-left: 20px; font-size: 21px; line-height: 1.4; color: var(--text); }
+.summary-item--wide li::before { content: ""; position: absolute; left: 0; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.summary-item--wide li strong { font-weight: 640; color: var(--text); }
+@media screen {
+  [data-theme="dark"] .figure img.pareto-img--light,
+  :root:not([data-theme])[data-default-theme="dark"] .figure img.pareto-img--light { display: none; }
+  [data-theme="dark"] .figure img.pareto-img--dark,
+  :root:not([data-theme])[data-default-theme="dark"] .figure img.pareto-img--dark { display: block; }
+}
+@media print {
+  :root[data-print-theme="dark"] .figure img.pareto-img--light { display: none; }
+  :root[data-print-theme="dark"] .figure img.pareto-img--dark { display: block; }
+}
+</style>
+</head>
+
+<body>
+<!-- MIT License (c) html-docs runtime; see LICENSE in repository. -->
+
+<main class="deck-stage">
+
+  <!-- 1. Opening -->
+  <section class="slide slide--title" id="s-title">
+    <p class="slide-eyebrow">Microsoft Frontier Day Praha · 26. listopadu 2026</p>
+    <h1>Od asistenta k <em>autopilotům</em></h1>
+    <p class="slide-sub">Seznamte se s digitálními kolegy</p>
+    <p class="slide-meta">Viktor Kunst · Tomáš Kubica</p>
+  </section>
+
+  <!-- 2. Architecture map: Two sides of the same coin -->
+  <section class="slide" id="s-two-sides">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Návaznost na ukázku u Javorny</p>
+      <h2 class="slide-title">Stejný zážitek v Teams, dvě cesty pod kapotou</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 410" role="img" aria-labelledby="map-title" style="width:100%;height:auto;display:block">
+          <title id="map-title">Mapa M365 a Azure</title>
+
+          <!-- Top unified UX -->
+          <rect x="0" y="6" width="1120" height="72" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="560" y="38" text-anchor="middle" fill="var(--text)" font-size="22" font-weight="650">Teams a Microsoft 365 Copilot</text>
+          <text x="560" y="63" text-anchor="middle" fill="var(--text-muted)" font-size="16">Entra Agent ID · Agent 365</text>
+
+          <!-- Connectors down -->
+          <line x1="272" y1="78" x2="272" y2="112" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="848" y1="78" x2="848" y2="112" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Left column: M365 SaaS -->
+          <rect x="0" y="112" width="544" height="190" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="26" y="144" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.4">M365 SAAS · SPRAVOVANÉ</text>
+          <rect x="24" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="144" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot Autopilot</text>
+          <rect x="280" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="400" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Workspaces &amp; Cowork</text>
+          <rect x="24" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="144" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot Studio</text>
+          <rect x="280" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="400" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Managed Runtime</text>
+
+          <!-- Right column: Azure & OSS -->
+          <rect x="576" y="112" width="544" height="190" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="602" y="144" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.4">AZURE &amp; OSS · OTEVŘENÉ</text>
+          <rect x="600" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="720" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Microsoft Foundry</text>
+          <rect x="856" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="976" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot SDK 2.0</text>
+          <rect x="600" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="720" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Hermes Enterprise</text>
+          <rect x="856" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="976" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">ACA Sandboxes</text>
+
+          <!-- Connectors to shared foundation -->
+          <line x1="272" y1="302" x2="272" y2="334" stroke="var(--border-strong)" stroke-width="2"/>
+          <line x1="848" y1="302" x2="848" y2="334" stroke="var(--border-strong)" stroke-width="2"/>
+
+          <!-- Bottom shared foundation -->
+          <rect x="0" y="334" width="1120" height="66" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="560" y="374" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="620">Microsoft Copilot Harness · Multi-model · Auto &amp; Fusion</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 3. Section 1: Harness & Where Agents Run -->
+  <section class="slide slide--section" id="s-sec-harness">
+    <h2>Motor pod kapotou</h2>
+    <p class="slide-lead">Copilot Harness v Rustu, kde agenti běží a otevřený Hermes Enterprise.</p>
+  </section>
+
+  <!-- 4. Microsoft Copilot Harness in Rust across three surfaces -->
+  <section class="slide" id="s-harness">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Copilot Harness</p>
+      <h2 class="slide-title">Jeden Rust harness pohání SaaS i vlastní agenty</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 356" role="img" aria-labelledby="harness-title" style="width:100%;height:auto;display:block">
+          <title id="harness-title">Copilot Harness</title>
+
+          <!-- Left inputs -->
+          <rect x="0" y="42" width="236" height="106" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="118" y="88" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Modely a paměť</text>
+          <text x="118" y="116" text-anchor="middle" fill="var(--text-muted)" font-size="15">Foundry, BYOK, kontext</text>
+
+          <rect x="0" y="208" width="236" height="106" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="118" y="254" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Nástroje a MCP</text>
+          <text x="118" y="282" text-anchor="middle" fill="var(--text-muted)" font-size="15">API, soubory, sandbox</text>
+
+          <!-- Connectors left to center -->
+          <line x1="236" y1="95" x2="306" y2="152" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="236" y1="261" x2="306" y2="204" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Center Harness -->
+          <rect x="306" y="34" width="448" height="288" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.5"/>
+          <text x="530" y="76" text-anchor="middle" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.4">NATIVNÍ RUST RUNTIME</text>
+          <text x="530" y="116" text-anchor="middle" fill="var(--text)" font-size="26" font-weight="680">Microsoft Copilot Harness</text>
+
+          <rect x="336" y="144" width="388" height="58" rx="8" fill="var(--surface)" stroke="var(--accent-border)"/>
+          <text x="530" y="180" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Agentská smyčka · schvalování</text>
+
+          <rect x="336" y="220" width="388" height="58" rx="8" fill="var(--surface)" stroke="var(--accent-border)"/>
+          <text x="530" y="256" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Více relací v procesu · AHP</text>
+
+          <!-- Connectors center to right -->
+          <line x1="754" y1="130" x2="824" y2="62" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="754" y1="178" x2="824" y2="178" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="754" y1="226" x2="824" y2="294" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Right targets: 3 surfaces -->
+          <rect x="824" y="14" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="54" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Copilot Studio</text>
+          <text x="972" y="82" text-anchor="middle" fill="var(--text-muted)" font-size="15">Spravovaný sandbox (GA)</text>
+
+          <rect x="824" y="130" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="170" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Foundry Agent Service</text>
+          <text x="972" y="198" text-anchor="middle" fill="var(--text-muted)" font-size="15">Deklarativní i kontejnery (Preview)</text>
+
+          <rect x="824" y="246" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="286" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Copilot SDK 2.0</text>
+          <text x="972" y="314" text-anchor="middle" fill="var(--text-muted)" font-size="15">6 jazyků, ACA Sandbox (GA)</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 5. Four hosting tiers for agents -->
+  <section class="slide" id="s-hosting-spectrum">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Provoz agentů</p>
+      <h2 class="slide-title">Čtyři úrovně od infrastruktury po SaaS</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 388" role="img" aria-labelledby="spectrum-title" style="width:100%;height:auto;display:block">
+          <title id="spectrum-title">Spektrum</title>
+
+          <!-- Top spectrum axis -->
+          <text x="0" y="28" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.2">KONTROLA</text>
+          <line x1="118" y1="22" x2="948" y2="22" stroke="var(--accent)" stroke-width="2.5"/>
+          <polygon points="110,22 122,16 122,28" fill="var(--accent)"/>
+          <polygon points="956,22 944,16 944,28" fill="var(--accent)"/>
+          <text x="1120" y="28" text-anchor="end" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.2">JEDNODUCHOST</text>
+
+          <!-- Tier 1: ACA Sandboxes -->
+          <rect x="0" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="20" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">STAVEBNÍ BLOK</text>
+          <text x="20" y="124" fill="var(--text)" font-size="22" font-weight="650">ACA Sandboxes</text>
+          <text x="20" y="160" fill="var(--text-muted)" font-size="16">Spustíte cokoli.</text>
+          <text x="20" y="188" fill="var(--text-muted)" font-size="16">MicroVM izolace, VNET.</text>
+          <rect x="18" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="131" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">SDK 2.0, Hermes, jakýkoli kód</text>
+
+          <!-- Tier 2: Microsoft Foundry -->
+          <rect x="286" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="306" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">PRO-CODE PLATFORMA</text>
+          <text x="306" y="124" fill="var(--text)" font-size="22" font-weight="650">Microsoft Foundry</text>
+          <text x="306" y="160" fill="var(--text-muted)" font-size="16">Observabilita, evals</text>
+          <text x="306" y="188" fill="var(--text-muted)" font-size="16">paměť, guardrails</text>
+          <text x="306" y="216" fill="var(--text-muted)" font-size="16">optimalizace, VNET.</text>
+          <rect x="304" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="417" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">Harness, BYO AKS</text>
+
+          <!-- Tier 3: Copilot Studio -->
+          <rect x="572" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="592" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">LOW-CODE PLATFORMA</text>
+          <text x="592" y="124" fill="var(--text)" font-size="22" font-weight="650">Copilot Studio</text>
+          <text x="592" y="160" fill="var(--text-muted)" font-size="16">Observabilita, DLP,</text>
+          <text x="592" y="188" fill="var(--text-muted)" font-size="16">konektory,</text>
+          <text x="592" y="216" fill="var(--text-muted)" font-size="16">managed modely.</text>
+          <rect x="590" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="703" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">Classic, MS Copilot Harness</text>
+
+          <!-- Tier 4: M365 SaaS -->
+          <rect x="858" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="878" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">SAAS</text>
+          <text x="878" y="124" fill="var(--text)" font-size="22" font-weight="650">M365 SaaS</text>
+          <text x="878" y="160" fill="var(--text-muted)" font-size="16">Autopilot, Cowork</text>
+          <rect x="876" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="989" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">M365 Admin</text>
+
+          <!-- Bottom cross-cutting governance bar -->
+          <rect x="0" y="330" width="1120" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="560" y="361" text-anchor="middle" fill="var(--text)" font-size="17" font-weight="600">Agent 365: governance a bezpečnost napříč variantami.</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 6. Hermes Enterprise -->
+  <section class="slide" id="s-hermes">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Otevřený ekosystém</p>
+      <h2 class="slide-title">Hermes Enterprise dává otevřenému agentu Teams UX</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Nous Research + Microsoft</span>
+          <ul>
+            <li>Open-source agent s učením dovedností.</li>
+            <li>Opakované kroky převádí do kódu.</li>
+            <li>Oficiální partnerství z Ignite 2026.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Azure a Microsoft 365</span>
+          <ul>
+            <li>Dnes ACA Sandboxes (20 tis.+ instancí).</li>
+            <li>Chystáme nativní provoz ve Foundry.</li>
+            <li>Identita v Teams přes Agent 365.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Section 2: M365 Collaboration & App Hosting -->
+  <section class="slide slide--section" id="s-sec-runtime">
+    <h2>Spolupráce v M365 a provoz aplikací</h2>
+    <p class="slide-lead">Autopilot, Workspaces, hosting aplikace a shrnutí M365 SaaS vs. Azure.</p>
+  </section>
+
+  <!-- 8. Autopilot + Copilot Workspaces -->
+  <section class="slide" id="s-autopilot-workspaces">
+    <div class="slide-head">
+      <p class="slide-eyebrow">M365 SaaS</p>
+      <h2 class="slide-title">Autopilot je kolega, Workspaces prostor pro tým</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Autopilot · KDO pracuje</span>
+          <ul>
+            <li>Role Otta: vždy běžící autonomní agent.</li>
+            <li>Vlastní počítač, paměť, rutiny a Entra ID.</li>
+            <li>Dlouhodobý cíl a manažer.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Workspaces · KDO tým tvoří</span>
+          <ul>
+            <li>Sdílený prostor, nikoli další agent.</li>
+            <li>Evoluce Notebooks z „já“ na „my“.</li>
+            <li>Lidé i agenti spolu v Copilotu a Teams.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Web App Hosting: ACA Sandboxes vs Copilot Managed Runtime -->
+  <section class="slide" id="s-cmr-vs-aca">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Webová aplikace z dema</p>
+      <h2 class="slide-title">Webová aplikace běží v Azure i M365 managed</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Azure ACA Sandboxes (GA)</span>
+          <ul>
+            <li>Cesta z ukázky: microVM startující pod 1 s.</li>
+            <li>Kontrola nad VNET, backendem a identitou.</li>
+            <li>Uspání a horký start, neplatím když neběží.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Copilot Managed Runtime (GA)</span>
+          <ul>
+            <li>Spravovaný hosting aplikací i bez Azure.</li>
+            <li>Copilot Code, Cowork, Studio i 3P nástroje.</li>
+            <li>Nativní Work IQ, Entra a DLP v M365.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. Decision matrix: SaaS vs Foundry/OSS -->
+  <section class="slide" id="s-decision">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Shrnutí · M365 SaaS vs. Azure</p>
+      <h2 class="slide-title">Volba je mezi rychlostí nasazení a mírou kontroly</h2>
+    </div>
+    <div class="slide-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Oblast</th>
+            <th>M365 SaaS &amp; Studio</th>
+            <th>Foundry, SDK 2.0 &amp; OSS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Čas nasazení</strong></td>
+            <td>Dny, 1 500+ konektorů</td>
+            <td>Vlastní vývoj a CI/CD</td>
+          </tr>
+          <tr>
+            <td><strong>Provoz</strong></td>
+            <td>Managed Runtime, DLP</td>
+            <td>VNET, CMK, ACA Sandboxes</td>
+          </tr>
+          <tr>
+            <td><strong>Modely a smyčka</strong></td>
+            <td>Kurátorované + Auto</td>
+            <td>11 000+ modelů, vlastní harness</td>
+          </tr>
+          <tr>
+            <td><strong>Nejlepší fit</strong></td>
+            <td>Týmová práce v M365</td>
+            <td>Vlastní produkty a OSS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11. Section 3: Multi-model & Economics -->
+  <section class="slide slide--section" id="s-sec-models">
+    <h2>Multi-model a ekonomika</h2>
+    <p class="slide-lead">Proč nevsázet na jednoho tvůrce modelu a jak funguje Pareto hranice.</p>
+  </section>
+
+  <!-- 12. Multi-model reality -->
+  <section class="slide" id="s-multimodel">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Multi-model strategie</p>
+      <h2 class="slide-title">Pořadí modelů se dnes mění během jediného týdne</h2>
+    </div>
+    <div class="slide-body">
+      <ul class="arrow-list">
+        <li>Za posledních 60 dní vyšlo přes 30 frontier LLM modelů (průměrně 4 týdně); Foundry nabízí přes 11 000 modelů.</li>
+        <li>Jen během Ignite: GPT-6.2 (17. 11.) a hned druhý den Gemini 4 Neon (18. 11.).</li>
+        <li>Multi-model platforma umožňuje nasadit nejlepší model bez přepisování agentů.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 13. Pareto optimal frontier -->
+  <section class="slide" id="s-pareto">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Pareto hranice</p>
+      <h2 class="slide-title">Rozhoduje cena úlohy, ne ceník tokenů</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col two-col--wide-left">
+        <figure class="figure">
+          <img class="pareto-img pareto-img--light" src="assets/pareto-frontier-light.svg" width="740" height="504" alt="Artificial Analysis: Intelligence Index v5.0.2 vs. Cost per Task (Pareto optimal frontier)">
+          <img class="pareto-img pareto-img--dark" src="assets/pareto-frontier-dark.svg" width="740" height="504" alt="Artificial Analysis: Intelligence Index v5.0.2 vs. Cost per Task (Pareto optimal frontier)">
+        </figure>
+        <div>
+          <span class="col-label">Pareto optimal frontier</span>
+          <ul>
+            <li>Uzavřený model nemusí být drahý — viz GPT-6 Luna a Haiku 5.5.</li>
+            <li>Cenu určují všechny spálené tokeny včetně uvažování (med → max).</li>
+            <li>Open-weights nejsou zdarma: Kimi K3.1 Pro (1,56 TB vah) vyžaduje 16× H200/B200 v DC.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="slide-note">Zdroj dat: Artificial Analysis — https://artificialanalysis.ai (Intelligence Index v5.0.2, 25. 11. 2026)</p>
+    </div>
+  </section>
+
+  <!-- 14. Auto routing, Copilot Fusion & MAI -->
+  <section class="slide" id="s-auto-fusion">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Směrování a MAI</p>
+      <h2 class="slide-title">Auto, Fusion a modely MAI</h2>
+    </div>
+    <div class="slide-body">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-label">M365 Auto</span>
+          Volí model i uvažování podle zadání.
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">GITHUB COPILOT FUSION (GA)</span>
+          Standard/High/Max; Fusion Max −51 % ($5,59 vs. $11,42).
+        </div>
+        <div class="summary-item summary-item--wide">
+          <span class="summary-label">Microsoft AI modely a vlastní váhy</span>
+          <ul>
+            <li><strong>Modely:</strong> Code-2 (GitHub GA), Cyber-2-Flash, Image-2.7, Voice-3, Realtime-1, Decision 1.1.</li>
+            <li><strong>Fine-tuning:</strong> specializace (Excel) zlevňuje AI až 10×.</li>
+            <li><strong>Výhled:</strong> velké MAI, licencování vah a izolovaný trénink v tenantu.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. Better together -->
+  <section class="slide" id="s-better-together">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Společně v jedné firmě</p>
+      <h2 class="slide-title">Obě strany mince se v praxi doplňují</h2>
+    </div>
+    <div class="slide-body">
+      <ol class="steps">
+        <li>
+          <h3>Začněte v M365 SaaS</h3>
+          <p>Workspaces, Autopilot a Studio pokryjí týmové scénáře bez složitého provozu.</p>
+        </li>
+        <li>
+          <h3>Specializujte přes Foundry a OSS</h3>
+          <p>Znalostní báze, pokročilé scénáře, otevřenost a integrace, hill-climbing.</p>
+        </li>
+        <li>
+          <h3>Jednotná UX a multi-model</h3>
+          <p>Auto, Fusion a MAI hlídají kvalitu i cenu.</p>
+        </li>
+        <li>
+          <h3>Řízení a bezpečnost s Agent 365</h3>
+          <p>Governance agentů napříč prostředími, ať běží kdekoli.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 15. Closing -->
+  <section class="slide slide--end" id="s-end">
+    <p>Jedna zkušenost pro lidi.<br><em>Svoboda volby pod kapotou.</em></p>
+  </section>
+
+</main>
+
+</body>
+</html>

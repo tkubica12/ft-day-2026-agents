@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="cs" data-default-theme="dark" data-default-accent="blue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Od asistenta k autopilotům — Agentská platforma Microsoft</title>
+<meta name="description" content="Dvě strany téže agentské platformy Microsoft: M365 SaaS a Azure Foundry po ukázce Javorna na Microsoft Frontier Day Praha.">
+<meta name="doc-id" content="ft2026-platform-deck">
+
+<!-- 1. Theme bootstrap. Must be the first script in <head>. -->
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"],
+    "print-theme": ["light", "dark"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "print-theme" ? "PDF theme: " + (current === "dark" ? "Dark" : "Light") :
+          name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "print-theme" ? "PDF theme: " + current + ". Switch to " + next :
+          name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name),
+      root.getAttribute(name === "print-theme" ? "data-print-theme" : "data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"], [data-action="toggle-print-theme"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+
+<!-- 2. Canonical design tokens. Copied verbatim from assets/tokens.css. -->
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen theme and print theme are independent; print stays light by default. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+@media print {
+  :root[data-print-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+
+<!-- 3. Shared deck runtime. -->
+<style>
+/* =========================================================================
+   html-docs / deck runtime
+   Shared stylesheet for standalone HTML presentations. Never edit per page.
+
+   Requires canonical tokens inline in the head, synchronized with sync-head.js.
+
+   Geometry: every slide is authored inside a fixed 1280 x 720 stage. The stage
+   is scaled to the viewport, so a slide that fits while authoring fits on any
+   projector.
+   ========================================================================= */
+
+/* ---------- base ---------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.js body { overflow: hidden; }
+
+a { color: var(--accent); text-underline-offset: 2px; }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* ---------- stage ----------------------------------------------------- */
+
+.deck-stage {
+  position: relative;
+  width: 1280px;
+  margin: 0 auto;
+  font-size: 24px;
+}
+
+.js .deck-stage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  height: 720px;
+  margin: 0;
+  transform: translate(-50%, -50%) scale(var(--deck-scale, 1));
+  transform-origin: center center;
+}
+
+/* ---------- slide ------------------------------------------------------ */
+
+.slide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 1280px;
+  height: 720px;
+  padding: 54px 72px 62px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.js .slide { position: absolute; inset: 0; display: none; }
+.js .slide[data-current] { display: flex; }
+
+html:not(.js) .slide {
+  border: 1px solid var(--border);
+  margin: 0 0 20px;
+}
+
+.slide-title {
+  margin: 0 0 6px;
+  font-size: 44px;
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+.slide-lead {
+  margin: 0 0 22px;
+  font-size: 24px;
+  color: var(--text-muted);
+}
+
+.slide-title + .slide-body { margin-top: 26px; }
+
+.slide-head {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 26px;
+}
+.slide-head .slide-title { margin: 0; }
+.slide-head .slide-lead { margin: 8px 0 0; }
+
+.slide-body {
+  flex: 1;
+  min-height: 0;
+  font-size: 26px;
+  zoom: var(--fit, 1);
+}
+
+.slide-note {
+  margin: 18px 0 0;
+  font-size: 18px;
+  color: var(--text-faint);
+}
+
+.slide-eyebrow {
+  margin: 0 0 18px;
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Title, section, and closing slides center their content. */
+.slide--title, .slide--section, .slide--end { justify-content: center; }
+
+.slide--title h1 {
+  margin: 0 0 18px;
+  font-size: 68px;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 680;
+}
+.slide--title .slide-sub {
+  margin: 0 0 32px;
+  max-width: 24em;
+  font-size: 28px;
+  color: var(--text-muted);
+}
+.slide--title .slide-meta {
+  margin: 0;
+  font-size: 19px;
+  color: var(--text-faint);
+}
+
+.slide--section {
+  background: var(--surface-2);
+}
+.slide--section h2 {
+  margin: 0;
+  font-size: 56px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 620;
+}
+.slide--section .slide-lead { margin-top: 16px; font-size: 26px; }
+
+.slide--end { background: var(--accent-soft); }
+.slide--end p {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.28;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  max-width: 22em;
+}
+
+/* ---------- layout helpers ---------------------------------------------- */
+
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  align-items: start;
+}
+.two-col--wide-left { grid-template-columns: 1.4fr 1fr; }
+.two-col--wide-right { grid-template-columns: 1fr 1.4fr; }
+
+.col-label {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.slide-body p { margin: 0 0 0.7em; }
+.slide-body p:last-child { margin-bottom: 0; }
+.slide-body ul, .slide-body ol { margin: 0 0 0.7em; padding-left: 1.2em; }
+.slide-body li { margin: 0.32em 0; }
+.slide-body h3 { margin: 0 0 10px; font-size: 27px; }
+.slide-body strong { font-weight: 650; }
+
+/* ---------- shared components -------------------------------------------- */
+
+.arrow-list { margin: 0; padding: 0; list-style: none; }
+.arrow-list > li {
+  position: relative;
+  margin: 0 0 14px;
+  padding-left: 38px;
+}
+.arrow-list > li::before {
+  content: "\2192";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.summary-item {
+  padding: 18px 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 23px;
+}
+.summary-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.steps > li {
+  position: relative;
+  counter-increment: step;
+  margin: 0 0 16px;
+  padding-left: 58px;
+}
+.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 50%;
+}
+.steps h3, .steps h4 { margin: 0 0 2px; font-size: 25px; }
+.steps p { font-size: 22px; color: var(--text-muted); }
+
+.sequence {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sequence > li {
+  position: relative;
+  padding: 18px 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent-quiet);
+  border-radius: var(--radius-sm);
+}
+.sequence > li.sequence-item--emphasis { border-left-color: var(--accent-strong); background: var(--accent-soft); }
+.sequence > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--border-strong);
+  border-top: 2px solid var(--border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+.seq-title { display: block; font-weight: 620; font-size: 23px; margin-bottom: 4px; }
+.seq-note { display: block; font-size: 20px; color: var(--text-muted); }
+
+.callout {
+  margin: 0 0 16px;
+  padding: 16px 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 23px;
+}
+.callout:last-child { margin-bottom: 0; }
+.callout-label {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.callout--warning {
+  background: var(--warn-soft);
+  border-color: var(--warn-border);
+  border-left-color: var(--warn);
+}
+.callout--warning .callout-label { color: var(--warn); }
+.callout--verdict {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  border-left-color: var(--accent-strong);
+}
+.callout--source, .callout--author { border-left-color: var(--border-strong); }
+.callout--source .callout-label, .callout--author .callout-label { color: var(--text-muted); }
+
+/* note is the base appearance; the modifier exists so that every callout in a
+   document names its meaning explicitly */
+.callout--note { border-left-color: var(--accent); }
+.callout--rule { border-left-color: var(--text); background: var(--surface-3); }
+.callout--rule .callout-label { color: var(--text); }
+
+.code { margin: 0 0 16px; }
+.code:last-child { margin-bottom: 0; }
+.code-label {
+  display: inline-block;
+  margin: 0 0 -1px;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.code pre {
+  margin: 0;
+  padding: 18px 22px;
+  overflow-x: auto;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 21px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+}
+.code pre code { font-size: inherit; }
+.code:not(:has(.code-label)) pre { border-radius: var(--radius-sm); }
+
+:not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.06em 0.32em;
+}
+
+.figure { margin: 0; }
+.figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 470px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.figure figcaption {
+  margin-top: 10px;
+  font-size: 18px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.quote {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.34;
+  font-weight: 500;
+}
+.quote-attrib {
+  display: block;
+  margin-top: 18px;
+  font-size: 20px;
+  color: var(--text-muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 22px;
+}
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+th {
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 620;
+}
+
+/* Backup detail kept off the slide until asked for. */
+.reveal { margin: 16px 0 0; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.reveal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 18px;
+  font: inherit;
+  font-size: 21px;
+  text-align: left;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.reveal-toggle::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.reveal[data-open] > .reveal-toggle::before { transform: rotate(45deg); }
+.reveal-body { padding: 0 18px 16px 39px; font-size: 22px; }
+.js .reveal-body { display: none; }
+.js .reveal[data-open] > .reveal-body { display: block; }
+
+/* ---------- fragments ---------------------------------------------------- */
+
+.js .frag { visibility: hidden; opacity: 0; transition: opacity 0.16s ease; }
+.js .frag[data-shown] { visibility: visible; opacity: 1; }
+.slide:focus { outline: none; }
+.slide--title::before, .slide--end::before {
+  content: ""; width: 80px; height: 6px; margin-bottom: 32px; background: var(--accent); flex: none;
+}
+.slide--end { background: var(--surface); }
+.slide--title em, .slide--end em { color: var(--accent); font-style: normal; }
+
+/* ---------- chrome -------------------------------------------------------- */
+
+.deck-chrome { display: none; }
+.js .deck-chrome { display: flex; position: fixed; z-index: 30; }
+
+.deck-controls {
+  top: 14px;
+  right: 16px;
+  gap: 6px;
+  padding: 5px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  opacity: 0.16;
+  transition: opacity 0.35s ease;
+}
+/* Pointer movement brings the controls part-way up so they can be found
+   without knowing where to hover. Declared before the hover rule because the
+   two selectors weigh the same, and hover must always reach full opacity. */
+[data-chrome="awake"] .deck-controls { opacity: 0.75; }
+.deck-controls:hover, .deck-controls:focus-within { opacity: 1; }
+
+.deck-controls button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.deck-controls button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.deck-controls button:hover { background: var(--surface-2); color: var(--text); }
+
+.deck-progress {
+  bottom: 12px;
+  right: 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.deck-bar {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  display: block !important;
+}
+.deck-bar span {
+  display: block;
+  height: 100%;
+  width: var(--deck-progress, 0%);
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+/* ---------- slide index ---------------------------------------------------- */
+
+.deck-index {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  padding: 0;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+}
+.deck-index::backdrop { background: rgba(0, 0, 0, 0.6); }
+.deck-index h2 {
+  margin: 0;
+  padding: 20px 24px 12px;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.deck-index ol {
+  margin: 0;
+  padding: 0 12px 16px;
+  list-style: none;
+  overflow: auto;
+  max-height: calc(100vh - 190px);
+}
+.deck-index button {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.deck-index button:hover { background: var(--surface-2); }
+.deck-index button[aria-current="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+.deck-index .idx-num { font-family: var(--font-mono); color: var(--text-faint); }
+.deck-index .idx-kind { color: var(--text-faint); font-size: 13px; }
+
+/* ---------- motion, print --------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  .js .frag { visibility: visible; opacity: 1; }
+}
+
+@media print {
+  @page { size: 297mm 167mm; margin: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .js body { overflow: visible; }
+  .js .deck-stage {
+    position: static;
+    transform: none;
+    width: auto;
+    height: auto;
+  }
+  .js .slide, .js .slide[data-current] {
+    position: relative;
+    display: flex !important;
+    break-after: page;
+    border: 0;
+  }
+  .js .frag { visibility: visible; opacity: 1 !important; }
+  .js .reveal-body { display: block !important; }
+  .deck-chrome, .js .deck-chrome { display: none !important; }
+}
+</style>
+<script>
+(function () {
+  function boot() {
+/* =========================================================================
+   html-docs / deck runtime
+   Shared script for standalone HTML presentations. Never edit per page.
+
+   The deck is readable without JavaScript: every slide is present in the HTML
+   and stacks vertically. This script adds stage scaling, navigation,
+   fragments, the slide index, and the theme toggle.
+   ========================================================================= */
+
+(() => {
+  "use strict";
+
+  const root = document.documentElement;
+  const preferences = window.HtmlDocs;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const STAGE_W = 1280;
+  const STAGE_H = 720;
+  /* Below this the body text stops being readable from the back of a room.
+     A slide that still overflows here has to be split by the author. */
+  const MIN_FIT = 0.85;
+
+  const els = (sel, scope) => Array.from((scope || document).querySelectorAll(sel));
+  const el = (sel, scope) => (scope || document).querySelector(sel);
+
+  const stage = el(".deck-stage");
+  if (!stage) return;
+
+  const slides = els(".slide", stage);
+  if (!slides.length) return;
+
+  slides.forEach((slide, i) => {
+    if (!slide.id) slide.id = "slide-" + (i + 1);
+    slide.tabIndex = -1;
+    slide.setAttribute("role", "group");
+    slide.setAttribute("aria-roledescription", "slide");
+    slide.setAttribute("aria-label", `${i + 1} of ${slides.length}: ${slideLabel(slide)}`);
+  });
+
+  let index = 0;
+  let step = 0;
+  let indexDialog = null;
+  let chromeTimer = null;
+
+  /* "step" reveals fragments one at a time; "all" shows the whole slide and
+     makes one advance mean one slide. Presenters who are talking to a build
+     want the first; anyone reading or reviewing wants the second. */
+  let revealAll = preferences.read("animations") === "all";
+
+  /* ---------- chrome ------------------------------------------------- */
+
+  function buildChrome() {
+    const controls = document.createElement("div");
+    controls.className = "deck-chrome deck-controls";
+    controls.setAttribute("role", "group");
+    controls.setAttribute("aria-label", "Presentation controls");
+    controls.innerHTML =
+      '<button type="button" data-deck="prev" aria-label="Previous slide">Prev</button>' +
+      '<button type="button" data-deck="next" aria-label="Next slide">Next</button>' +
+      '<button type="button" data-deck="index">Slides</button>' +
+      '<button type="button" data-deck="reveal" aria-pressed="true" ' +
+      'aria-label="Animate points one at a time, or show each slide whole">Animations</button>' +
+      '<button type="button" data-deck="full">Full screen</button>' +
+      '<button type="button" data-action="print" aria-label="Save as PDF or print">PDF</button>' +
+      '<button type="button" data-action="toggle-print-theme">PDF theme: Light</button>' +
+      '<button type="button" data-action="toggle-theme">Dark</button>' +
+      '<button type="button" data-action="toggle-accent">Accent: Blue</button>';
+
+    const progress = document.createElement("div");
+    progress.className = "deck-chrome deck-progress";
+    progress.setAttribute("aria-live", "polite");
+
+    const bar = document.createElement("div");
+    bar.className = "deck-chrome deck-bar";
+    bar.innerHTML = "<span></span>";
+
+    document.body.append(controls, progress, bar);
+
+    controls.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-deck]");
+      if (!button) return;
+      const kind = button.getAttribute("data-deck");
+      if (kind === "prev") back();
+      else if (kind === "next") forward();
+      else if (kind === "index") openIndex();
+      else if (kind === "reveal") setReveal(!revealAll);
+      else toggleFullscreen();
+      dropPointerFocus(event, button);
+    });
+
+    markReveal();
+    preferences.refresh();
+  }
+
+  /* ---------- reveal mode ---------------------------------------------- */
+
+  /* The label is deliberately constant. A button whose text changes with its
+     state resizes the whole pill on every press, which is more distracting
+     than the setting is important; the pressed styling carries the state. */
+  function markReveal() {
+    const button = el('[data-deck="reveal"]');
+    if (!button) return;
+    button.setAttribute("aria-pressed", revealAll || reduced.matches ? "false" : "true");
+    button.disabled = reduced.matches;
+    button.setAttribute("aria-label", reduced.matches ? "Animations off: reduced motion preference" : "Animate points one at a time");
+  }
+
+  function setReveal(next) {
+    revealAll = !!next;
+    preferences.write("animations", revealAll ? "all" : "step");
+    markReveal();
+    /* Returning to step mode restarts the build on the current slide rather
+       than leaving it half-revealed, so the presenter gets a clean run-up. */
+    step = revealAll ? fragments(slides[index]).length : 0;
+    render();
+  }
+
+  /* ---------- chrome visibility ----------------------------------------- */
+
+  /* The controls sit at 0.14 opacity so they never compete with the slide.
+     That also makes them easy to miss, so any pointer movement brings them
+     part-way up for a moment. Hovering still takes them to full strength. */
+  /* The chrome rests near-invisible so it stays out of a recording. That only
+     works if the presenter has been shown it once, so it is held up for a few
+     seconds on load and lifted again whenever the mouse moves. */
+  function wakeChrome(ms) {
+    root.setAttribute("data-chrome", "awake");
+    clearTimeout(chromeTimer);
+    chromeTimer = setTimeout(() => root.removeAttribute("data-chrome"), ms || 2400);
+  }
+
+  /* A pointer click leaves the button focused, and :focus-within holds the
+     whole bar at full opacity for the rest of the talk. Keyboard activation
+     reports detail 0 and keeps its focus ring. */
+  function dropPointerFocus(event, node) {
+    if (event.detail > 0 && node && node.blur) node.blur();
+  }
+
+  /* ---------- scaling ------------------------------------------------- */
+
+  function scaleStage() {
+    const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+    stage.style.setProperty("--deck-scale", String(scale));
+  }
+
+  function fitSlide(slide) {
+    const body = el(".slide-body", slide);
+    if (!body) return;
+    body.style.setProperty("--fit", "1");
+    if (!body.clientHeight || body.scrollHeight <= body.clientHeight + 1) return;
+
+    /* Converge instead of trusting one ratio: margins between blocks and
+       sub-pixel rounding both survive the scale, so a single computed guess
+       reliably leaves a few pixels of content clipped. */
+    let fit = Math.max(MIN_FIT, (body.clientHeight / body.scrollHeight) * 0.99);
+    body.style.setProperty("--fit", String(fit));
+    let guard = 0;
+    while (body.scrollHeight > body.clientHeight + 1 && fit > MIN_FIT && guard < 20) {
+      fit = Math.max(MIN_FIT, fit - 0.02);
+      body.style.setProperty("--fit", String(fit));
+      guard += 1;
+    }
+    if (body.scrollHeight > body.clientHeight + 1) {
+      console.warn("html-docs: slide content overflows at readable size. Split this slide: #" + slide.id);
+    }
+  }
+
+  /* ---------- navigation ----------------------------------------------- */
+
+  function fragments(slide) {
+    return els(".frag", slide);
+  }
+
+  function render() {
+    slides.forEach((slide) => slide.removeAttribute("data-current"));
+    const slide = slides[index];
+    slide.setAttribute("data-current", "");
+
+    fragments(slide).forEach((frag, i) => {
+      const shown = revealAll || reduced.matches || i < step;
+      frag.setAttribute("aria-hidden", String(!shown));
+      if (shown) frag.setAttribute("data-shown", "");
+      else frag.removeAttribute("data-shown");
+    });
+
+    const progress = el(".deck-progress");
+    if (progress) progress.textContent = (index + 1) + " / " + slides.length;
+    const bar = el(".deck-bar span");
+    if (bar) bar.style.setProperty("--deck-progress", ((index + 1) / slides.length) * 100 + "%");
+
+    fitSlide(slide);
+
+    markIndex();
+
+    history.replaceState(null, "", location.pathname + location.search + "#" + slide.id);
+  }
+
+  function go(next, atEnd) {
+    index = Math.min(slides.length - 1, Math.max(0, next));
+    step = (atEnd || revealAll) ? fragments(slides[index]).length : 0;
+    render();
+    slides[index].tabIndex = -1;
+    slides[index].focus({ preventScroll: true });
+  }
+
+  function forward() {
+    const total = fragments(slides[index]).length;
+    if (!revealAll && !reduced.matches && step < total) {
+      step += 1;
+      render();
+      return;
+    }
+    if (index < slides.length - 1) go(index + 1, false);
+  }
+
+  function back() {
+    if (!revealAll && !reduced.matches && step > 0) {
+      step -= 1;
+      render();
+      return;
+    }
+    if (index > 0) go(index - 1, true);
+  }
+
+  function toggleFullscreen() {
+    const action = document.fullscreenElement ? document.exitFullscreen() : root.requestFullscreen();
+    action.catch(() => { el(".deck-progress").textContent += " | Full screen unavailable"; });
+  }
+
+  /* ---------- slide index ------------------------------------------------ */
+
+  function escapeText(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function slideLabel(slide) {
+    const title = el(".slide-title, h1, h2", slide);
+    if (title && title.textContent.trim()) {
+      const copy = title.cloneNode(true);
+      els("br", copy).forEach(br => br.replaceWith(" "));
+      return copy.textContent.trim().replace(/\s+/g, " ");
+    }
+    const text = (slide.textContent || "").replace(/\s+/g, " ").trim();
+    if (text) return text.length > 64 ? text.slice(0, 63).trimEnd() + "\u2026" : text;
+    return slide.id;
+  }
+
+  function slideKind(slide) {
+    if (slide.classList.contains("slide--title")) return "Title";
+    if (slide.classList.contains("slide--section")) return "Section";
+    if (slide.classList.contains("slide--end")) return "Closing";
+    return "";
+  }
+
+  function markIndex() {
+    if (!indexDialog) return;
+    els("button", indexDialog).forEach((button, i) =>
+      button.setAttribute("aria-current", i === index ? "true" : "false"));
+  }
+
+  function openIndex() {
+    if (!indexDialog) {
+      indexDialog = document.createElement("dialog");
+      indexDialog.className = "deck-index";
+      indexDialog.setAttribute("aria-label", "Slide index");
+      indexDialog.addEventListener("close", () => slides[index].focus({ preventScroll: true }));
+      const items = slides.map((slide, i) =>
+        '<li><button type="button" data-go="' + i + '">' +
+        '<span class="idx-num">' + (i + 1) + "</span><span>" +
+        escapeText(slideLabel(slide)) +
+        (slideKind(slide) ? ' <span class="idx-kind">' + slideKind(slide) + "</span>" : "") +
+        "</span></button></li>").join("");
+      indexDialog.innerHTML = "<h2>Slides</h2><ol>" + items + "</ol>";
+      document.body.appendChild(indexDialog);
+      indexDialog.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-go]");
+        if (!button) return;
+        go(parseInt(button.getAttribute("data-go"), 10), false);
+        indexDialog.close();
+        slides[index].focus({ preventScroll: true });
+        /* Closing returns focus to the Slides button, which would otherwise
+           keep the controls bar lit. */
+        dropPointerFocus(event, document.activeElement);
+      });
+    }
+    markIndex();
+    indexDialog.showModal();
+    const current = el('button[aria-current="true"]', indexDialog);
+    if (current) current.focus();
+  }
+
+  /* ---------- reveals ------------------------------------------------------ */
+
+  els(".reveal").forEach((reveal) => {
+    const toggle = el(":scope > .reveal-toggle", reveal);
+    const body = el(":scope > .reveal-body", reveal);
+    if (!toggle || !body) return;
+    if (!body.id) body.id = "reveal-" + Math.random().toString(36).slice(2, 8);
+    toggle.setAttribute("aria-controls", body.id);
+    toggle.setAttribute("aria-expanded", reveal.hasAttribute("data-open") ? "true" : "false");
+    toggle.addEventListener("click", () => {
+      const open = !reveal.hasAttribute("data-open");
+      if (open) reveal.setAttribute("data-open", "");
+      else reveal.removeAttribute("data-open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      fitSlide(slides[index]);
+    });
+  });
+
+  /* ---------- input --------------------------------------------------------- */
+
+  document.addEventListener("keydown", (event) => {
+    if (el("dialog[open]") || event.altKey || event.ctrlKey || event.metaKey ||
+        event.target.closest("input, select, textarea, [contenteditable]")) return;
+    if (event.target.closest("button, a") && [" ", "Enter"].includes(event.key)) return;
+    const key = event.key;
+    if (key === "PageDown") {
+      event.preventDefault();
+      go(index + 1);
+    } else if (key === "PageUp") {
+      event.preventDefault();
+      go(index - 1, true);
+    } else if (key === "ArrowRight" || key === " " || key === "Spacebar") {
+      event.preventDefault();
+      forward();
+    } else if (key === "ArrowLeft") {
+      event.preventDefault();
+      back();
+    } else if (key === "Home") {
+      event.preventDefault();
+      go(0, false);
+    } else if (key === "End") {
+      event.preventDefault();
+      go(slides.length - 1, true);
+    } else if (key === "f" || key === "F") {
+      event.preventDefault();
+      toggleFullscreen();
+    } else if (key === "o" || key === "O") {
+      event.preventDefault();
+      openIndex();
+    } else if (key === "a" || key === "A") {
+      event.preventDefault();
+      setReveal(!revealAll);
+    }
+  });
+
+  document.addEventListener("mousemove", () => wakeChrome(2400), { passive: true });
+  reduced.addEventListener("change", () => { markReveal(); render(); });
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("button, a, input, select, textarea, dialog")) return;
+    forward();
+  });
+
+  let touchX = null;
+  document.addEventListener("touchstart", (event) => {
+    touchX = event.changedTouches[0].clientX;
+  }, { passive: true });
+  document.addEventListener("touchend", (event) => {
+    if (touchX === null) return;
+    const delta = event.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(delta) < 45) return;
+    if (delta < 0) forward();
+    else back();
+  }, { passive: true });
+
+  window.addEventListener("resize", () => {
+    scaleStage();
+    fitSlide(slides[index]);
+  });
+
+  /* ---------- start ---------------------------------------------------------- */
+
+  buildChrome();
+  scaleStage();
+  preferences.keepAwake(true);
+
+  const wanted = slides.findIndex((slide) => "#" + slide.id === location.hash);
+  go(wanted >= 0 ? wanted : 0, false);
+  wakeChrome(4200);
+
+  window.addEventListener("hashchange", () => {
+    const target = slides.findIndex((slide) => "#" + slide.id === location.hash);
+    if (target >= 0 && target !== index) go(target, false);
+  });
+
+  window.addEventListener("load", () => {
+    scaleStage();
+    fitSlide(slides[index]);
+  });
+})();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else { boot(); }
+})();
+</script>
+<style>
+.figure img.pareto-img { width: 100%; height: auto; border: 0; border-radius: 0; }
+.figure img.pareto-img--dark { display: none; }
+.summary-item--wide { grid-column: 1 / -1; padding: 22px 24px; }
+.summary-item--wide ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.summary-item--wide li { position: relative; padding-left: 20px; font-size: 21px; line-height: 1.4; color: var(--text); }
+.summary-item--wide li::before { content: ""; position: absolute; left: 0; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.summary-item--wide li strong { font-weight: 640; color: var(--text); }
+@media screen {
+  [data-theme="dark"] .figure img.pareto-img--light,
+  :root:not([data-theme])[data-default-theme="dark"] .figure img.pareto-img--light { display: none; }
+  [data-theme="dark"] .figure img.pareto-img--dark,
+  :root:not([data-theme])[data-default-theme="dark"] .figure img.pareto-img--dark { display: block; }
+}
+@media print {
+  :root[data-print-theme="dark"] .figure img.pareto-img--light { display: none; }
+  :root[data-print-theme="dark"] .figure img.pareto-img--dark { display: block; }
+}
+</style>
+</head>
+
+<body>
+<!-- MIT License (c) html-docs runtime; see LICENSE in repository. -->
+
+<main class="deck-stage">
+
+  <!-- 1. Opening -->
+  <section class="slide slide--title" id="s-title">
+    <p class="slide-eyebrow">Microsoft Frontier Day Praha · 26. listopadu 2026</p>
+    <h1>Od asistenta k <em>autopilotům</em></h1>
+    <p class="slide-sub">Seznamte se s digitálními kolegy</p>
+    <p class="slide-meta">Viktor Kunst · Tomáš Kubica</p>
+  </section>
+
+  <!-- 2. Architecture map: Two sides of the same coin -->
+  <section class="slide" id="s-two-sides">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Návaznost na ukázku u Javorny</p>
+      <h2 class="slide-title">Stejný zážitek v Teams, dvě cesty pod kapotou</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 410" role="img" aria-labelledby="map-title" style="width:100%;height:auto;display:block">
+          <title id="map-title">Mapa M365 a Azure</title>
+
+          <!-- Top unified UX -->
+          <rect x="0" y="6" width="1120" height="72" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="560" y="38" text-anchor="middle" fill="var(--text)" font-size="22" font-weight="650">Teams a Microsoft 365 Copilot</text>
+          <text x="560" y="63" text-anchor="middle" fill="var(--text-muted)" font-size="16">Entra Agent ID · Agent 365</text>
+
+          <!-- Connectors down -->
+          <line x1="272" y1="78" x2="272" y2="112" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="848" y1="78" x2="848" y2="112" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Left column: M365 SaaS -->
+          <rect x="0" y="112" width="544" height="190" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="26" y="144" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.4">M365 SAAS · SPRAVOVANÉ</text>
+          <rect x="24" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="144" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot Autopilot</text>
+          <rect x="280" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="400" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Workspaces &amp; Cowork</text>
+          <rect x="24" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="144" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot Studio</text>
+          <rect x="280" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="400" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Managed Runtime</text>
+
+          <!-- Right column: Azure & OSS -->
+          <rect x="576" y="112" width="544" height="190" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="602" y="144" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.4">AZURE &amp; OSS · OTEVŘENÉ</text>
+          <rect x="600" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="720" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Microsoft Foundry</text>
+          <rect x="856" y="162" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="976" y="194" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Copilot SDK 2.0</text>
+          <rect x="600" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="720" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Hermes Enterprise</text>
+          <rect x="856" y="228" width="240" height="52" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="976" y="260" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">ACA Sandboxes</text>
+
+          <!-- Connectors to shared foundation -->
+          <line x1="272" y1="302" x2="272" y2="334" stroke="var(--border-strong)" stroke-width="2"/>
+          <line x1="848" y1="302" x2="848" y2="334" stroke="var(--border-strong)" stroke-width="2"/>
+
+          <!-- Bottom shared foundation -->
+          <rect x="0" y="334" width="1120" height="66" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="560" y="374" text-anchor="middle" fill="var(--text)" font-size="20" font-weight="620">Microsoft Copilot Harness · Multi-model · Auto &amp; Fusion</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 3. Section 1: Harness & Where Agents Run -->
+  <section class="slide slide--section" id="s-sec-harness">
+    <h2>Motor pod kapotou</h2>
+    <p class="slide-lead">Copilot Harness v Rustu, kde agenti běží a otevřený Hermes Enterprise.</p>
+  </section>
+
+  <!-- 4. Microsoft Copilot Harness in Rust across three surfaces -->
+  <section class="slide" id="s-harness">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Copilot Harness</p>
+      <h2 class="slide-title">Jeden Rust harness pohání SaaS i vlastní agenty</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 356" role="img" aria-labelledby="harness-title" style="width:100%;height:auto;display:block">
+          <title id="harness-title">Copilot Harness</title>
+
+          <!-- Left inputs -->
+          <rect x="0" y="42" width="236" height="106" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="118" y="88" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Modely a paměť</text>
+          <text x="118" y="116" text-anchor="middle" fill="var(--text-muted)" font-size="15">Foundry, BYOK, kontext</text>
+
+          <rect x="0" y="208" width="236" height="106" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="118" y="254" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Nástroje a MCP</text>
+          <text x="118" y="282" text-anchor="middle" fill="var(--text-muted)" font-size="15">API, soubory, sandbox</text>
+
+          <!-- Connectors left to center -->
+          <line x1="236" y1="95" x2="306" y2="152" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="236" y1="261" x2="306" y2="204" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Center Harness -->
+          <rect x="306" y="34" width="448" height="288" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.5"/>
+          <text x="530" y="76" text-anchor="middle" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.4">NATIVNÍ RUST RUNTIME</text>
+          <text x="530" y="116" text-anchor="middle" fill="var(--text)" font-size="26" font-weight="680">Microsoft Copilot Harness</text>
+
+          <rect x="336" y="144" width="388" height="58" rx="8" fill="var(--surface)" stroke="var(--accent-border)"/>
+          <text x="530" y="180" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Agentská smyčka · schvalování</text>
+
+          <rect x="336" y="220" width="388" height="58" rx="8" fill="var(--surface)" stroke="var(--accent-border)"/>
+          <text x="530" y="256" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="600">Více relací v procesu · AHP</text>
+
+          <!-- Connectors center to right -->
+          <line x1="754" y1="130" x2="824" y2="62" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="754" y1="178" x2="824" y2="178" stroke="var(--accent)" stroke-width="2.5"/>
+          <line x1="754" y1="226" x2="824" y2="294" stroke="var(--accent)" stroke-width="2.5"/>
+
+          <!-- Right targets: 3 surfaces -->
+          <rect x="824" y="14" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="54" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Copilot Studio</text>
+          <text x="972" y="82" text-anchor="middle" fill="var(--text-muted)" font-size="15">Spravovaný sandbox (GA)</text>
+
+          <rect x="824" y="130" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="170" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Foundry Agent Service</text>
+          <text x="972" y="198" text-anchor="middle" fill="var(--text-muted)" font-size="15">Deklarativní i kontejnery (Preview)</text>
+
+          <rect x="824" y="246" width="296" height="96" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="972" y="286" text-anchor="middle" fill="var(--text)" font-size="19" font-weight="620">Copilot SDK 2.0</text>
+          <text x="972" y="314" text-anchor="middle" fill="var(--text-muted)" font-size="15">6 jazyků, ACA Sandbox (GA)</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 5. Four hosting tiers for agents -->
+  <section class="slide" id="s-hosting-spectrum">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Provoz agentů</p>
+      <h2 class="slide-title">Čtyři úrovně od infrastruktury po SaaS</h2>
+    </div>
+    <div class="slide-body">
+      <figure class="figure">
+        <svg viewBox="0 0 1120 388" role="img" aria-labelledby="spectrum-title" style="width:100%;height:auto;display:block">
+          <title id="spectrum-title">Spektrum</title>
+
+          <!-- Top spectrum axis -->
+          <text x="0" y="28" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.2">KONTROLA</text>
+          <line x1="118" y1="22" x2="948" y2="22" stroke="var(--accent)" stroke-width="2.5"/>
+          <polygon points="110,22 122,16 122,28" fill="var(--accent)"/>
+          <polygon points="956,22 944,16 944,28" fill="var(--accent)"/>
+          <text x="1120" y="28" text-anchor="end" fill="var(--accent)" font-size="15" font-weight="650" letter-spacing="1.2">JEDNODUCHOST</text>
+
+          <!-- Tier 1: ACA Sandboxes -->
+          <rect x="0" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="20" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">STAVEBNÍ BLOK</text>
+          <text x="20" y="124" fill="var(--text)" font-size="22" font-weight="650">ACA Sandboxes</text>
+          <text x="20" y="160" fill="var(--text-muted)" font-size="16">Spustíte cokoli.</text>
+          <text x="20" y="188" fill="var(--text-muted)" font-size="16">MicroVM izolace, VNET.</text>
+          <rect x="18" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="131" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">SDK 2.0, Hermes, jakýkoli kód</text>
+
+          <!-- Tier 2: Microsoft Foundry -->
+          <rect x="286" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="306" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">PRO-CODE PLATFORMA</text>
+          <text x="306" y="124" fill="var(--text)" font-size="22" font-weight="650">Microsoft Foundry</text>
+          <text x="306" y="160" fill="var(--text-muted)" font-size="16">Observabilita, evals</text>
+          <text x="306" y="188" fill="var(--text-muted)" font-size="16">paměť, guardrails</text>
+          <text x="306" y="216" fill="var(--text-muted)" font-size="16">optimalizace, VNET.</text>
+          <rect x="304" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="417" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">Harness, BYO AKS</text>
+
+          <!-- Tier 3: Copilot Studio -->
+          <rect x="572" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="592" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">LOW-CODE PLATFORMA</text>
+          <text x="592" y="124" fill="var(--text)" font-size="22" font-weight="650">Copilot Studio</text>
+          <text x="592" y="160" fill="var(--text-muted)" font-size="16">Observabilita, DLP,</text>
+          <text x="592" y="188" fill="var(--text-muted)" font-size="16">konektory,</text>
+          <text x="592" y="216" fill="var(--text-muted)" font-size="16">managed modely.</text>
+          <rect x="590" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="703" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">Classic, MS Copilot Harness</text>
+
+          <!-- Tier 4: M365 SaaS -->
+          <rect x="858" y="54" width="262" height="254" rx="10" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="878" y="88" fill="var(--accent)" font-size="14" font-weight="650" letter-spacing="1.2">SAAS</text>
+          <text x="878" y="124" fill="var(--text)" font-size="22" font-weight="650">M365 SaaS</text>
+          <text x="878" y="160" fill="var(--text-muted)" font-size="16">Autopilot, Cowork</text>
+          <rect x="876" y="242" width="226" height="48" rx="6" fill="var(--surface)" stroke="var(--border)"/>
+          <text x="989" y="271" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="600">M365 Admin</text>
+
+          <!-- Bottom cross-cutting governance bar -->
+          <rect x="0" y="330" width="1120" height="50" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="560" y="361" text-anchor="middle" fill="var(--text)" font-size="17" font-weight="600">Agent 365: governance a bezpečnost napříč variantami.</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 6. Hermes Enterprise -->
+  <section class="slide" id="s-hermes">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Otevřený ekosystém</p>
+      <h2 class="slide-title">Hermes Enterprise dává otevřenému agentu Teams UX</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Nous Research + Microsoft</span>
+          <ul>
+            <li>Open-source agent s učením dovedností.</li>
+            <li>Opakované kroky převádí do kódu.</li>
+            <li>Oficiální partnerství z Ignite 2026.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Azure a Microsoft 365</span>
+          <ul>
+            <li>Dnes ACA Sandboxes (20 tis.+ instancí).</li>
+            <li>Chystáme nativní provoz ve Foundry.</li>
+            <li>Identita v Teams přes Agent 365.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Section 2: M365 Collaboration & App Hosting -->
+  <section class="slide slide--section" id="s-sec-runtime">
+    <h2>Spolupráce v M365 a provoz aplikací</h2>
+    <p class="slide-lead">Autopilot, Workspaces, hosting aplikace a shrnutí M365 SaaS vs. Azure.</p>
+  </section>
+
+  <!-- 8. Autopilot + Copilot Workspaces -->
+  <section class="slide" id="s-autopilot-workspaces">
+    <div class="slide-head">
+      <p class="slide-eyebrow">M365 SaaS</p>
+      <h2 class="slide-title">Autopilot je kolega, Workspaces prostor pro tým</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Autopilot · KDO pracuje</span>
+          <ul>
+            <li>Role Otta: vždy běžící autonomní agent.</li>
+            <li>Vlastní počítač, paměť, rutiny a Entra ID.</li>
+            <li>Dlouhodobý cíl a manažer.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Workspaces · KDO tým tvoří</span>
+          <ul>
+            <li>Sdílený prostor, nikoli další agent.</li>
+            <li>Evoluce Notebooks z „já“ na „my“.</li>
+            <li>Lidé i agenti spolu v Copilotu a Teams.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Web App Hosting: ACA Sandboxes vs Copilot Managed Runtime -->
+  <section class="slide" id="s-cmr-vs-aca">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Webová aplikace z dema</p>
+      <h2 class="slide-title">Webová aplikace běží v Azure i M365 managed</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col">
+        <div>
+          <span class="col-label">Azure ACA Sandboxes (GA)</span>
+          <ul>
+            <li>Cesta z ukázky: microVM startující pod 1 s.</li>
+            <li>Kontrola nad VNET, backendem a identitou.</li>
+            <li>Uspání a horký start, neplatím když neběží.</li>
+          </ul>
+        </div>
+        <div>
+          <span class="col-label">Copilot Managed Runtime (GA)</span>
+          <ul>
+            <li>Spravovaný hosting aplikací i bez Azure.</li>
+            <li>Copilot Code, Cowork, Studio i 3P nástroje.</li>
+            <li>Nativní Work IQ, Entra a DLP v M365.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. Decision matrix: SaaS vs Foundry/OSS -->
+  <section class="slide" id="s-decision">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Shrnutí · M365 SaaS vs. Azure</p>
+      <h2 class="slide-title">Volba je mezi rychlostí nasazení a mírou kontroly</h2>
+    </div>
+    <div class="slide-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Oblast</th>
+            <th>M365 SaaS &amp; Studio</th>
+            <th>Foundry, SDK 2.0 &amp; OSS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Čas nasazení</strong></td>
+            <td>Dny, 1 500+ konektorů</td>
+            <td>Vlastní vývoj a CI/CD</td>
+          </tr>
+          <tr>
+            <td><strong>Provoz</strong></td>
+            <td>Managed Runtime, DLP</td>
+            <td>VNET, CMK, ACA Sandboxes</td>
+          </tr>
+          <tr>
+            <td><strong>Modely a smyčka</strong></td>
+            <td>Kurátorované + Auto</td>
+            <td>11 000+ modelů, vlastní harness</td>
+          </tr>
+          <tr>
+            <td><strong>Nejlepší fit</strong></td>
+            <td>Týmová práce v M365</td>
+            <td>Vlastní produkty a OSS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11. Section 3: Multi-model & Economics -->
+  <section class="slide slide--section" id="s-sec-models">
+    <h2>Multi-model a ekonomika</h2>
+    <p class="slide-lead">Proč nevsázet na jednoho tvůrce modelu a jak funguje Pareto hranice.</p>
+  </section>
+
+  <!-- 12. Multi-model reality -->
+  <section class="slide" id="s-multimodel">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Multi-model strategie</p>
+      <h2 class="slide-title">Pořadí modelů se dnes mění během jediného týdne</h2>
+    </div>
+    <div class="slide-body">
+      <ul class="arrow-list">
+        <li>Za posledních 60 dní vyšlo přes 30 frontier LLM modelů (průměrně 4 týdně); Foundry nabízí přes 11 000 modelů.</li>
+        <li>Jen během Ignite: GPT-6.2 (17. 11.) a hned druhý den Gemini 4 Neon (18. 11.).</li>
+        <li>Multi-model platforma umožňuje nasadit nejlepší model bez přepisování agentů.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 13. Pareto optimal frontier -->
+  <section class="slide" id="s-pareto">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Pareto hranice</p>
+      <h2 class="slide-title">Rozhoduje cena úlohy, ne ceník tokenů</h2>
+    </div>
+    <div class="slide-body">
+      <div class="two-col two-col--wide-left">
+        <figure class="figure">
+          <img class="pareto-img pareto-img--light" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzQwIiBoZWlnaHQ9IjUwNCIgdmlld0JveD0iMCAwIDc0MCA1MDQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJwYXJldG8tdGl0bGUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3R5bGU9IndpZHRoOjEwMCU7aGVpZ2h0OmF1dG87ZGlzcGxheTpibG9jaztmb250LWZhbWlseTotYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICdTZWdvZSBVSSBWYXJpYWJsZSBUZXh0JywgJ1NlZ29lIFVJJywgUm9ib3RvLCAnSGVsdmV0aWNhIE5ldWUnLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHRpdGxlIGlkPSJwYXJldG8tdGl0bGUiPkFydGlmaWNpYWwgQW5hbHlzaXM6IEludGVsbGlnZW5jZSBJbmRleCB2cy4gQ29zdCBwZXIgVGFzayAoUGFyZXRvIE9wdGltYWwgRnJvbnRpZXIpPC90aXRsZT4KICA8cmVjdCB4PSIxIiB5PSIxIiB3aWR0aD0iNzM4IiBoZWlnaHQ9IjUwMiIgcng9IjEyIiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkZWRlZGUiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgPHRleHQgeD0iMTgiIHk9IjI0IiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iNjUwIj5BcnRpZmljaWFsIEFuYWx5c2lzIMK3IEludGVsbGlnZW5jZSBJbmRleCB2NS4wLjIgdnMuIENvc3QgcGVyIFRhc2s8L3RleHQ+CiAgPHRleHQgeD0iNzIyIiB5PSIyNCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzY4Njg2OCIgZm9udC1zaXplPSIxMSI+MjUuIDExLiAyMDI2IMK3IExvZyBYPC90ZXh0PgogIDx0ZXh0IHg9IjY0LjAiIHk9IjU1LjAiIGZpbGw9IiMwMDZkYTAiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI2MzAiIG9wYWNpdHk9IjAuOTIiPuKGliBWecWhxaHDrSBrdmFsaXRhLCBuacW+xaHDrSBjZW5hIChQYXJldG8gb3B0aW11bSk8L3RleHQ+CiAgPGxpbmUgeDE9IjU0LjAiIHkxPSIzOTcuMyIgeDI9IjcyMC4wIiB5Mj0iMzk3LjMiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iNDAxLjMiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPjE1PC90ZXh0PgogIDxsaW5lIHgxPSI1NC4wIiB5MT0iMzMwLjEiIHgyPSI3MjAuMCIgeTI9IjMzMC4xIiBzdHJva2U9IiNkZWRlZGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC43MiIvPgogIDx0ZXh0IHg9IjQ2LjAiIHk9IjMzNC4xIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjExIj4yNTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjI2My4wIiB4Mj0iNzIwLjAiIHkyPSIyNjMuMCIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNzIiLz4KICA8dGV4dCB4PSI0Ni4wIiB5PSIyNjcuMCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMSI+MzU8L3RleHQ+CiAgPGxpbmUgeDE9IjU0LjAiIHkxPSIxOTUuOCIgeDI9IjcyMC4wIiB5Mj0iMTk1LjgiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iMTk5LjgiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPjQ1PC90ZXh0PgogIDxsaW5lIHgxPSI1NC4wIiB5MT0iMTI4LjciIHgyPSI3MjAuMCIgeTI9IjEyOC43IiBzdHJva2U9IiNkZWRlZGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC43MiIvPgogIDx0ZXh0IHg9IjQ2LjAiIHk9IjEzMi43IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjExIj41NTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjYxLjUiIHgyPSI3MjAuMCIgeTI9IjYxLjUiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iNjUuNSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMSI+NjU8L3RleHQ+CiAgPGxpbmUgeDE9IjEwMS4wIiB5MT0iMzguMCIgeDI9IjEwMS4wIiB5Mj0iNDA0LjAiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iMTAxLjAiIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjExIj4kMC4wNTwvdGV4dD4KICA8bGluZSB4MT0iMTY0LjciIHkxPSIzOC4wIiB4Mj0iMTY0LjciIHkyPSI0MDQuMCIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSIxNjQuNyIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPiQwLjEwPC90ZXh0PgogIDxsaW5lIHgxPSIyNDguOSIgeTE9IjM4LjAiIHgyPSIyNDguOSIgeTI9IjQwNC4wIiBzdHJva2U9IiNkZWRlZGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC42NSIvPgogIDx0ZXh0IHg9IjI0OC45IiB5PSI0MjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMSI+JDAuMjU8L3RleHQ+CiAgPGxpbmUgeDE9IjMxMi43IiB5MT0iMzguMCIgeDI9IjMxMi43IiB5Mj0iNDA0LjAiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iMzEyLjciIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjExIj4kMC41MDwvdGV4dD4KICA8bGluZSB4MT0iMzc2LjQiIHkxPSIzOC4wIiB4Mj0iMzc2LjQiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSIzNzYuNCIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPiQxPC90ZXh0PgogIDxsaW5lIHgxPSI0NDAuMSIgeTE9IjM4LjAiIHgyPSI0NDAuMSIgeTI9IjQwNC4wIiBzdHJva2U9IiNkZWRlZGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC42NSIvPgogIDx0ZXh0IHg9IjQ0MC4xIiB5PSI0MjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMSI+JDI8L3RleHQ+CiAgPGxpbmUgeDE9IjUyNC4zIiB5MT0iMzguMCIgeDI9IjUyNC4zIiB5Mj0iNDA0LjAiIHN0cm9rZT0iI2RlZGVkZSIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iNTI0LjMiIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjExIj4kNTwvdGV4dD4KICA8bGluZSB4MT0iNTg4LjEiIHkxPSIzOC4wIiB4Mj0iNTg4LjEiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSI1ODguMSIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPiQxMDwvdGV4dD4KICA8bGluZSB4MT0iNjcyLjMiIHkxPSIzOC4wIiB4Mj0iNjcyLjMiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSI2NzIuMyIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTEiPiQyNTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjM4LjAiIHgyPSI1NC4wIiB5Mj0iNDA0LjAiIHN0cm9rZT0iI2I4YjhiOCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjQwNC4wIiB4Mj0iNzIwLjAiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjYjhiOGI4IiBzdHJva2Utd2lkdGg9IjEuMiIvPgogIDx0ZXh0IHg9IjM4Ny4wIiB5PSI0MzguMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjYwMCI+Q2VuYSB6YSDDumxvaHUg4oCUIENvc3QgcGVyIFRhc2sgKFVTRCwgbG9nYXJpdG1pY2vDoSBvc2EpPC90ZXh0PgogIDx0ZXh0IHg9IjE2IiB5PSIyMjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjYwMCIgdHJhbnNmb3JtPSJyb3RhdGUoLTkwIDE2IDIyMS4wKSI+SW50ZWxsaWdlbmNlIEluZGV4PC90ZXh0PgogIDxwYXRoIGQ9Ik0gODUuNCAzNzQuMSBMIDE1Ni44IDMzMi44IEwgMTkyLjkgMjU1LjYgTCAyMTIuOCAyNDIuMSBMIDI5My41IDE0Ni4wIEwgMzc3LjcgMTEzLjUgTCA1MDMuOCA4MC40IEwgNjc3LjggNjMuMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDA2ZGEwIiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWRhc2hhcnJheT0iNiA0IiBvcGFjaXR5PSIwLjkyIi8+CiAgPCEtLSBSZWFzb25pbmcgcmFuZ2UgY29ubmVjdG9ycyAobWVkIC0+IG1heC94aGlnaCkgLS0+CiAgPGxpbmUgeDE9Ijg1LjQiIHkxPSIzNzQuMSIgeDI9IjIwMy4yIiB5Mj0iMzExLjAiIHN0cm9rZT0iIzE2MTYxNiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSIyMTIuOCIgeTE9IjI0Mi4xIiB4Mj0iMzcyLjciIHkyPSIxNTIuOSIgc3Ryb2tlPSIjMTYxNjE2IiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjI5My41IiB5MT0iMTQ2LjAiIHgyPSIzNzcuNyIgeTI9IjExMy41IiBzdHJva2U9IiMxNjE2MTYiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNDIwLjYiIHkxPSIxMTQuOSIgeDI9IjUwMy44IiB5Mj0iODAuNCIgc3Ryb2tlPSIjMTYxNjE2IiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjE1Ni44IiB5MT0iMzMyLjgiIHgyPSIyOTQuNiIgeTI9IjI1Mi43IiBzdHJva2U9IiNkNDYzM2YiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iMzUzLjYiIHkxPSIyOTAuNyIgeDI9IjU4OC4zIiB5Mj0iMTMwLjUiIHN0cm9rZT0iI2Q0NjMzZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0NTguOCIgeTE9IjE3My45IiB4Mj0iNTg4LjQiIHkyPSIxMDEuMCIgc3Ryb2tlPSIjZDQ2MzNmIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjQ5OS4yIiB5MT0iMTE5LjgiIHgyPSI2NzcuOCIgeTI9IjYzLjEiIHN0cm9rZT0iI2Q0NjMzZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSIzNTUuNiIgeTE9IjIyMS44IiB4Mj0iNDgyLjIiIHkyPSIxMzQuOSIgc3Ryb2tlPSIjMTY5YzUyIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjU0OS43IiB5MT0iMTA2LjEiIHgyPSI1NjQuNyIgeTI9Ijk0LjIiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0MzUuNiIgeTE9IjEyOS4yIiB4Mj0iNTQ3LjciIHkyPSI4NC43IiBzdHJva2U9IiMxNjljNTIiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNDc1LjAiIHkxPSIyODguOSIgeDI9IjU2NC45IiB5Mj0iMjYwLjUiIHN0cm9rZT0iIzdjNmJlNiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0MDguMSIgeTE9IjM0My4wIiB4Mj0iNDQyLjkiIHkyPSIzMjIuNiIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPCEtLSBMZWFkZXIgbGluZXMgLS0+CiAgPGxpbmUgeDE9IjU4OC40IiB5MT0iMTAxLjAiIHgyPSI2MDguNCIgeTI9IjExMC41IiBzdHJva2U9IiNkNDYzM2YiIHN0cm9rZS13aWR0aD0iMS4wIiBzdHJva2UtZGFzaGFycmF5PSIyIDIiIG9wYWNpdHk9IjAuNjgiLz4KICA8bGluZSB4MT0iNDgyLjIiIHkxPSIxMzQuOSIgeDI9IjQ5Ny4yIiB5Mj0iMTUzLjQiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI1NjQuNyIgeTE9Ijk0LjIiIHgyPSI2MDguNyIgeTI9Ijk0LjciIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI1NDcuNyIgeTE9Ijg0LjciIHgyPSI2MDEuNyIgeTI9Ijc5LjIiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI0MjguOCIgeTE9IjM0My4xIiB4Mj0iNDM3LjgiIHkyPSIzNTUuNiIgc3Ryb2tlPSIjMjU2M2ViIiBzdHJva2Utd2lkdGg9IjEuMCIgc3Ryb2tlLWRhc2hhcnJheT0iMiAyIiBvcGFjaXR5PSIwLjY4Ii8+CiAgPCEtLSBEYXRhIHBvaW50cyAtLT4KICA8Y2lyY2xlIGN4PSIyMDMuMiIgY3k9IjMxMS4wIiByPSI0LjgiIGZpbGw9IiMxNjE2MTYiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjM3Mi43IiBjeT0iMTUyLjkiIHI9IjQuOCIgZmlsbD0iIzE2MTYxNiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDIwLjYiIGN5PSIxMTQuOSIgcj0iMy43IiBmaWxsPSIjMTYxNjE2IiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSIyOTQuNiIgY3k9IjI1Mi43IiByPSI0LjgiIGZpbGw9IiNkNDYzM2YiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjM1My42IiBjeT0iMjkwLjciIHI9IjMuNyIgZmlsbD0iI2Q0NjMzZiIgZmlsbC1vcGFjaXR5PSIwLjc0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNTg4LjMiIGN5PSIxMzAuNSIgcj0iNC44IiBmaWxsPSIjZDQ2MzNmIiBmaWxsLW9wYWNpdHk9IjAuOTQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI0NTguOCIgY3k9IjE3My45IiByPSIzLjciIGZpbGw9IiNkNDYzM2YiIGZpbGwtb3BhY2l0eT0iMC43NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjU4OC40IiBjeT0iMTAxLjAiIHI9IjQuOCIgZmlsbD0iI2Q0NjMzZiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDk5LjIiIGN5PSIxMTkuOCIgcj0iMy43IiBmaWxsPSIjZDQ2MzNmIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSIzNTUuNiIgY3k9IjIyMS44IiByPSIzLjciIGZpbGw9IiMxNjljNTIiIGZpbGwtb3BhY2l0eT0iMC43NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjQ4Mi4yIiBjeT0iMTM0LjkiIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNTQ5LjciIGN5PSIxMDYuMSIgcj0iMy43IiBmaWxsPSIjMTY5YzUyIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NjQuNyIgY3k9Ijk0LjIiIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDM1LjYiIGN5PSIxMjkuMiIgcj0iMy43IiBmaWxsPSIjMTY5YzUyIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NDcuNyIgY3k9Ijg0LjciIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDc1LjAiIGN5PSIyODguOSIgcj0iMy43IiBmaWxsPSIjN2M2YmU2IiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NjQuOSIgY3k9IjI2MC41IiByPSI0LjgiIGZpbGw9IiM3YzZiZTYiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxwb2x5Z29uIHBvaW50cz0iNDk2LjIsMTc5LjggNTAxLjgsMTg1LjQgNDk2LjIsMTkxLjAgNDkwLjYsMTg1LjQiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzA4OTFiMiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8cG9seWdvbiBwb2ludHM9IjMyOS43LDI3NC44IDMzNS4zLDI4MC40IDMyOS43LDI4Ni4wIDMyNC4xLDI4MC40IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iMi4xIi8+CiAgPHBvbHlnb24gcG9pbnRzPSI0MjguOCwzMzcuNSA0MzQuNCwzNDMuMSA0MjguOCwzNDguNyA0MjMuMiwzNDMuMSIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjMjU2M2ViIiBzdHJva2Utd2lkdGg9IjIuMSIvPgogIDxwb2x5Z29uIHBvaW50cz0iNTI0LjUsMjgwLjUgNTMwLjEsMjg2LjEgNTI0LjUsMjkxLjcgNTE4LjksMjg2LjEiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzBlYTVlOSIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8cG9seWdvbiBwb2ludHM9IjI1MS41LDI5MS40IDI1Ny4xLDI5Ny4wIDI1MS41LDMwMi42IDI0NS45LDI5Ny4wIiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNmOTczMTYiIHN0cm9rZS13aWR0aD0iMi4xIi8+CiAgPHBvbHlnb24gcG9pbnRzPSI0MDguMSwzMzguNiA0MTIuNSwzNDMuMCA0MDguMSwzNDcuNCA0MDMuNywzNDMuMCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjIuMSIvPgogIDxwb2x5Z29uIHBvaW50cz0iNDQyLjksMzE3LjAgNDQ4LjUsMzIyLjYgNDQyLjksMzI4LjIgNDM3LjMsMzIyLjYiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2UxMWQ0OCIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8Y2lyY2xlIGN4PSI0ODUuMiIgY3k9IjIxMC43IiByPSI0LjgiIGZpbGw9IiNkOTc3MDYiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzI0LjksMzAxLjIgMzMwLjUsMzA2LjggMzI0LjksMzEyLjQgMzE5LjMsMzA2LjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2Q5NzcwNiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8Y2lyY2xlIGN4PSI4NS40IiBjeT0iMzc0LjEiIHI9IjkuMCIgZmlsbD0iIzAwNmRhMCIgb3BhY2l0eT0iMC4xNyIvPgogIDxjaXJjbGUgY3g9Ijg1LjQiIGN5PSIzNzQuMSIgcj0iNS42IiBmaWxsPSIjMTYxNjE2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMjEyLjgiIGN5PSIyNDIuMSIgcj0iOS4wIiBmaWxsPSIjMDA2ZGEwIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMjEyLjgiIGN5PSIyNDIuMSIgcj0iNS42IiBmaWxsPSIjMTYxNjE2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMjkzLjUiIGN5PSIxNDYuMCIgcj0iOS4wIiBmaWxsPSIjMDA2ZGEwIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMjkzLjUiIGN5PSIxNDYuMCIgcj0iNS42IiBmaWxsPSIjMTYxNjE2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMzc3LjciIGN5PSIxMTMuNSIgcj0iOS4wIiBmaWxsPSIjMDA2ZGEwIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMzc3LjciIGN5PSIxMTMuNSIgcj0iNS42IiBmaWxsPSIjMTYxNjE2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iNTAzLjgiIGN5PSI4MC40IiByPSI5LjAiIGZpbGw9IiMwMDZkYTAiIG9wYWNpdHk9IjAuMTciLz4KICA8Y2lyY2xlIGN4PSI1MDMuOCIgY3k9IjgwLjQiIHI9IjUuNiIgZmlsbD0iIzE2MTYxNiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuNyIvPgogIDxjaXJjbGUgY3g9IjE1Ni44IiBjeT0iMzMyLjgiIHI9IjkuMCIgZmlsbD0iIzAwNmRhMCIgb3BhY2l0eT0iMC4xNyIvPgogIDxjaXJjbGUgY3g9IjE1Ni44IiBjeT0iMzMyLjgiIHI9IjUuNiIgZmlsbD0iI2Q0NjMzZiIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjEuNyIvPgogIDxjaXJjbGUgY3g9IjY3Ny44IiBjeT0iNjMuMSIgcj0iOS4wIiBmaWxsPSIjMDA2ZGEwIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iNjc3LjgiIGN5PSI2My4xIiByPSI1LjYiIGZpbGw9IiNkNDYzM2YiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjciLz4KICA8Y2lyY2xlIGN4PSIxOTIuOSIgY3k9IjI1NS42IiByPSI5LjAiIGZpbGw9IiMwMDZkYTAiIG9wYWNpdHk9IjAuMTciLz4KICA8Y2lyY2xlIGN4PSIxOTIuOSIgY3k9IjI1NS42IiByPSI1LjYiIGZpbGw9IiMwMjg0YzciIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjciLz4KICA8IS0tIExhYmVscyAtLT4KICA8dGV4dCB4PSI5Ni40IiB5PSIzODguMSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjExLjMiIGZvbnQtd2VpZ2h0PSI3MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdQVC02IEx1bmEgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iMjEzLjIiIHk9IjMyMi4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+THVuYSAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSIyMDAuOCIgeT0iMjM0LjEiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiMxNjE2MTYiIGZvbnQtc2l6ZT0iMTEuMyIgZm9udC13ZWlnaHQ9IjcwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R1BULTYuMSBUZXJyYSAobWVkKTwvdGV4dD4KICA8dGV4dCB4PSIzNjIuNyIgeT0iMTY2LjkiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+VGVycmEgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iMjgxLjUiIHk9IjE0OC4wIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjExLjMiIGZvbnQtd2VpZ2h0PSI3MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdQVC02LjIgU29sIChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjM2NS43IiB5PSIxMDYuNSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzE2MTYxNiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5HUFQtNi4yIFNvbCAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSI0MjcuNiIgeT0iMTA0LjkiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Bc3RyYSAobWVkKTwvdGV4dD4KICA8dGV4dCB4PSI0OTIuOCIgeT0iNjkuNCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzE2MTYxNiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5HUFQtNi4yIEFzdHJhIChtYXgpPC90ZXh0PgogIDx0ZXh0IHg9IjE0NS44IiB5PSIzMjkuOCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzE2MTYxNiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5IYWlrdSA1LjUgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iMzAzLjYiIHk9IjI1Ni43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+SGFpa3UgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iMzYyLjYiIHk9IjI5Ni43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+U29ubmV0IChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjU5OS4zIiB5PSIxMzUuNSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPlNvbm5ldCA1LjUgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iNDQ4LjgiIHk9IjE3OC45IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk9wdXMgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNjExLjQiIHk9IjExNC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+T3B1cyA1LjUgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iNTA4LjUiIHk9IjEyOC41IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+RmFibGUgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNzA5LjgiIHk9IjQ5LjEiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiMxNjE2MTYiIGZvbnQtc2l6ZT0iMTEuMyIgZm9udC13ZWlnaHQ9IjcwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+Q2xhdWRlIEZhYmxlIDUuMiAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSIzNDUuNiIgeT0iMjI1LjgiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+SHlkcm9nZW4gKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNTAwLjIiIHk9IjE1Ni45IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R2VtaW5pIDQgSHlkcm9nZW4gKHhoKTwvdGV4dD4KICA8dGV4dCB4PSI1NTYuNyIgeT0iMTE5LjEiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzY4Njg2OCIgZm9udC1zaXplPSI5LjIiIGZvbnQtd2VpZ2h0PSI1MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPm1lZDwvdGV4dD4KICA8dGV4dCB4PSI2MTEuNyIgeT0iOTguMiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdlbWluaSA0IENhcmJvbiAoaGkpPC90ZXh0PgogIDx0ZXh0IHg9IjQyNi42IiB5PSIxNDIuMiIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5OZW9uIChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjYwNC43IiB5PSI4Mi43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxNjE2MTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjY1MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R2VtaW5pIDQgTmVvbiAoeGgpPC90ZXh0PgogIDx0ZXh0IHg9IjQ2Ny4wIiB5PSIzMDAuOSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzY4Njg2OCIgZm9udC1zaXplPSI5LjIiIGZvbnQtd2VpZ2h0PSI1MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPmxvdzwvdGV4dD4KICA8dGV4dCB4PSI1NzQuOSIgeT0iMjY0LjUiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzE2MTYxNiIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNjUwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Hcm9rIDQuNyAoeGgpPC90ZXh0PgogIDx0ZXh0IHg9IjE4MC45IiB5PSIyNjUuNiIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzE2MTYxNiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5NdXNlIEVtYmVyIChtYXgpPC90ZXh0PgogIDx0ZXh0IHg9IjUwNi4yIiB5PSIxODkuNCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI2NTAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPktpbWkgSzMuMSBQcm88L3RleHQ+CiAgPHRleHQgeD0iMzE5LjciIHk9IjI3My40IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkRlZXBTZWVrIFY0LjEgRmxhc2g8L3RleHQ+CiAgPHRleHQgeD0iNDQwLjgiIHk9IjM1OS4xIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+RGVlcFNlZWsgVjQgUHJvPC90ZXh0PgogIDx0ZXh0IHg9IjUzNC41IiB5PSIyOTAuMSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdMTS01LjM8L3RleHQ+CiAgPHRleHQgeD0iMjQ3LjUiIHk9IjI4Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk1pTW8tVjIuNi1Qcm88L3RleHQ+CiAgPHRleHQgeD0iMzk5LjEiIHk9IjM0Ny4wIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNjg2ODY4IiBmb250LXNpemU9IjkuMiIgZm9udC13ZWlnaHQ9IjUwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+bWVkPC90ZXh0PgogIDx0ZXh0IHg9IjQ1Mi45IiB5PSIzMjYuNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI2NTAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk1pc3RyYWwgTGFyZ2UgNCAoRVUpPC90ZXh0PgogIDx0ZXh0IHg9IjQ5NS4yIiB5PSIyMTQuNyIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPlF3ZW40IE1heDwvdGV4dD4KICA8dGV4dCB4PSIzMzQuOSIgeT0iMzE3LjgiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Rd2VuMy44LUZsYXNoPC90ZXh0PgogIDxsaW5lIHgxPSIxOCIgeTE9IjQ0NiIgeDI9IjcyMiIgeTI9IjQ0NiIgc3Ryb2tlPSIjZGVkZWRlIiBzdHJva2Utd2lkdGg9IjEiLz4KICA8Y2lyY2xlIGN4PSIyNCIgY3k9IjQ2MCIgcj0iNC40IiBmaWxsPSIjMTYxNjE2Ii8+CiAgPHRleHQgeD0iMzMiIHk9IjQ2My44IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjgiPk9wZW5BSTwvdGV4dD4KICA8Y2lyY2xlIGN4PSI5MiIgY3k9IjQ2MCIgcj0iNC40IiBmaWxsPSIjZDQ2MzNmIi8+CiAgPHRleHQgeD0iMTAxIiB5PSI0NjMuOCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC44Ij5BbnRocm9waWM8L3RleHQ+CiAgPGNpcmNsZSBjeD0iMTc0IiBjeT0iNDYwIiByPSI0LjQiIGZpbGw9IiMxNjljNTIiLz4KICA8dGV4dCB4PSIxODMiIHk9IjQ2My44IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjgiPkdvb2dsZTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIyNDIiIGN5PSI0NjAiIHI9IjQuNCIgZmlsbD0iIzdjNmJlNiIvPgogIDx0ZXh0IHg9IjI1MSIgeT0iNDYzLjgiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuOCI+eEFJIChHcm9rKTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIzMjYiIGN5PSI0NjAiIHI9IjQuNCIgZmlsbD0iIzAyODRjNyIvPgogIDx0ZXh0IHg9IjMzNSIgeT0iNDYzLjgiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuOCI+TWV0YTwvdGV4dD4KICA8cG9seWdvbiBwb2ludHM9IjM4Niw0NTUuNCAzOTAuNiw0NjAgMzg2LDQ2NC42IDM4MS40LDQ2MCIgZmlsbD0iI2ZmZmZmZiIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjEuOSIvPgogIDx0ZXh0IHg9IjM5NSIgeT0iNDYzLjgiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuOCI+TWlzdHJhbCAoRVUpPC90ZXh0PgogIDxwb2x5Z29uIHBvaW50cz0iNDgwLDQ1NS40IDQ4NC42LDQ2MCA0ODAsNDY0LjYgNDc1LjQsNDYwIiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iMS45Ii8+CiAgPHRleHQgeD0iNDg5IiB5PSI0NjMuOCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC44Ij5LaW1pIC8gRGVlcFNlZWsgLyBHTE08L3RleHQ+CiAgPHBvbHlnb24gcG9pbnRzPSI2MzIsNDU1LjQgNjM2LjYsNDYwIDYzMiw0NjQuNiA2MjcuNCw0NjAiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2Y5NzMxNiIgc3Ryb2tlLXdpZHRoPSIxLjkiLz4KICA8dGV4dCB4PSI2NDEiIHk9IjQ2My44IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjgiPk1pTW8gLyBRd2VuPC90ZXh0PgogIDxsaW5lIHgxPSIyMCIgeTE9IjQ4NCIgeDI9IjQ0IiB5Mj0iNDg0IiBzdHJva2U9IiMwMDZkYTAiIHN0cm9rZS13aWR0aD0iMi4zIiBzdHJva2UtZGFzaGFycmF5PSI1IDMiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQ4NCIgcj0iNC4yIiBmaWxsPSIjMTYxNjE2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPHRleHQgeD0iNTEiIHk9IjQ4Ny44IiBmaWxsPSIjMTYxNjE2IiBmb250LXNpemU9IjEwLjgiIGZvbnQtd2VpZ2h0PSI2NjAiPlBhcmV0byBocmFuaWNlICh0dcSNbsSbKTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIyMDQiIGN5PSI0ODQiIHI9IjQuNCIgZmlsbD0iIzU2NTY1NiIvPgogIDx0ZXh0IHg9IjIxNCIgeT0iNDg3LjgiIGZpbGw9IiM1NjU2NTYiIGZvbnQtc2l6ZT0iMTAuOCI+UHJvcHJpZXTDoXJuw608L3RleHQ+CiAgPHBvbHlnb24gcG9pbnRzPSIzMDAsNDc5LjIgMzA0LjgsNDg0IDMwMCw0ODguOCAyOTUuMiw0ODQiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzU2NTY1NiIgc3Ryb2tlLXdpZHRoPSIxLjkiLz4KICA8dGV4dCB4PSIzMTAiIHk9IjQ4Ny44IiBmaWxsPSIjNTY1NjU2IiBmb250LXNpemU9IjEwLjgiPk9wZW4tV2VpZ2h0czwvdGV4dD4KICA8Y2lyY2xlIGN4PSI0MTQiIGN5PSI0ODQiIHI9IjMuNCIgZmlsbD0iIzU2NTY1NiIgb3BhY2l0eT0iMC43MiIvPgogIDxsaW5lIHgxPSI0MTciIHkxPSI0ODQiIHgyPSI0NDEiIHkyPSI0ODQiIHN0cm9rZT0iIzU2NTY1NiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNiIvPgogIDxjaXJjbGUgY3g9IjQ0MyIgY3k9IjQ4NCIgcj0iNC42IiBmaWxsPSIjNTY1NjU2Ii8+CiAgPHRleHQgeD0iNDUzIiB5PSI0ODcuOCIgZmlsbD0iIzU2NTY1NiIgZm9udC1zaXplPSIxMC44Ij5Sb3pwxJt0w60gcmVhc29uaW5ndSAobWVkIOKGkiBtYXggLyB4aGlnaCk8L3RleHQ+Cjwvc3ZnPgo=" width="740" height="504" alt="Artificial Analysis: Intelligence Index v5.0.2 vs. Cost per Task (Pareto optimal frontier)">
+          <img class="pareto-img pareto-img--dark" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzQwIiBoZWlnaHQ9IjUwNCIgdmlld0JveD0iMCAwIDc0MCA1MDQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJwYXJldG8tdGl0bGUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3R5bGU9IndpZHRoOjEwMCU7aGVpZ2h0OmF1dG87ZGlzcGxheTpibG9jaztmb250LWZhbWlseTotYXBwbGUtc3lzdGVtLCBCbGlua01hY1N5c3RlbUZvbnQsICdTZWdvZSBVSSBWYXJpYWJsZSBUZXh0JywgJ1NlZ29lIFVJJywgUm9ib3RvLCAnSGVsdmV0aWNhIE5ldWUnLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHRpdGxlIGlkPSJwYXJldG8tdGl0bGUiPkFydGlmaWNpYWwgQW5hbHlzaXM6IEludGVsbGlnZW5jZSBJbmRleCB2cy4gQ29zdCBwZXIgVGFzayAoUGFyZXRvIE9wdGltYWwgRnJvbnRpZXIpPC90aXRsZT4KICA8cmVjdCB4PSIxIiB5PSIxIiB3aWR0aD0iNzM4IiBoZWlnaHQ9IjUwMiIgcng9IjEyIiBmaWxsPSIjMTkxOTE5IiBzdHJva2U9IiMzNjM2MzYiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgPHRleHQgeD0iMTgiIHk9IjI0IiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjE0IiBmb250LXdlaWdodD0iNjUwIj5BcnRpZmljaWFsIEFuYWx5c2lzIMK3IEludGVsbGlnZW5jZSBJbmRleCB2NS4wLjIgdnMuIENvc3QgcGVyIFRhc2s8L3RleHQ+CiAgPHRleHQgeD0iNzIyIiB5PSIyNCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2EwYTBhMCIgZm9udC1zaXplPSIxMSI+MjUuIDExLiAyMDI2IMK3IExvZyBYPC90ZXh0PgogIDx0ZXh0IHg9IjY0LjAiIHk9IjU1LjAiIGZpbGw9IiMwMGE0ZWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI2MzAiIG9wYWNpdHk9IjAuOTIiPuKGliBWecWhxaHDrSBrdmFsaXRhLCBuacW+xaHDrSBjZW5hIChQYXJldG8gb3B0aW11bSk8L3RleHQ+CiAgPGxpbmUgeDE9IjU0LjAiIHkxPSIzOTcuMyIgeDI9IjcyMC4wIiB5Mj0iMzk3LjMiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iNDAxLjMiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPjE1PC90ZXh0PgogIDxsaW5lIHgxPSI1NC4wIiB5MT0iMzMwLjEiIHgyPSI3MjAuMCIgeTI9IjMzMC4xIiBzdHJva2U9IiMzNjM2MzYiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC43MiIvPgogIDx0ZXh0IHg9IjQ2LjAiIHk9IjMzNC4xIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjExIj4yNTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjI2My4wIiB4Mj0iNzIwLjAiIHkyPSIyNjMuMCIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNzIiLz4KICA8dGV4dCB4PSI0Ni4wIiB5PSIyNjcuMCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMSI+MzU8L3RleHQ+CiAgPGxpbmUgeDE9IjU0LjAiIHkxPSIxOTUuOCIgeDI9IjcyMC4wIiB5Mj0iMTk1LjgiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iMTk5LjgiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPjQ1PC90ZXh0PgogIDxsaW5lIHgxPSI1NC4wIiB5MT0iMTI4LjciIHgyPSI3MjAuMCIgeTI9IjEyOC43IiBzdHJva2U9IiMzNjM2MzYiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC43MiIvPgogIDx0ZXh0IHg9IjQ2LjAiIHk9IjEzMi43IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjExIj41NTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjYxLjUiIHgyPSI3MjAuMCIgeTI9IjYxLjUiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjcyIi8+CiAgPHRleHQgeD0iNDYuMCIgeT0iNjUuNSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMSI+NjU8L3RleHQ+CiAgPGxpbmUgeDE9IjEwMS4wIiB5MT0iMzguMCIgeDI9IjEwMS4wIiB5Mj0iNDA0LjAiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iMTAxLjAiIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjExIj4kMC4wNTwvdGV4dD4KICA8bGluZSB4MT0iMTY0LjciIHkxPSIzOC4wIiB4Mj0iMTY0LjciIHkyPSI0MDQuMCIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSIxNjQuNyIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPiQwLjEwPC90ZXh0PgogIDxsaW5lIHgxPSIyNDguOSIgeTE9IjM4LjAiIHgyPSIyNDguOSIgeTI9IjQwNC4wIiBzdHJva2U9IiMzNjM2MzYiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC42NSIvPgogIDx0ZXh0IHg9IjI0OC45IiB5PSI0MjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMSI+JDAuMjU8L3RleHQ+CiAgPGxpbmUgeDE9IjMxMi43IiB5MT0iMzguMCIgeDI9IjMxMi43IiB5Mj0iNDA0LjAiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iMzEyLjciIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjExIj4kMC41MDwvdGV4dD4KICA8bGluZSB4MT0iMzc2LjQiIHkxPSIzOC4wIiB4Mj0iMzc2LjQiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSIzNzYuNCIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPiQxPC90ZXh0PgogIDxsaW5lIHgxPSI0NDAuMSIgeTE9IjM4LjAiIHgyPSI0NDAuMSIgeTI9IjQwNC4wIiBzdHJva2U9IiMzNjM2MzYiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC42NSIvPgogIDx0ZXh0IHg9IjQ0MC4xIiB5PSI0MjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMSI+JDI8L3RleHQ+CiAgPGxpbmUgeDE9IjUyNC4zIiB5MT0iMzguMCIgeDI9IjUyNC4zIiB5Mj0iNDA0LjAiIHN0cm9rZT0iIzM2MzYzNiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjY1Ii8+CiAgPHRleHQgeD0iNTI0LjMiIHk9IjQyMS4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjExIj4kNTwvdGV4dD4KICA8bGluZSB4MT0iNTg4LjEiIHkxPSIzOC4wIiB4Mj0iNTg4LjEiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSI1ODguMSIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPiQxMDwvdGV4dD4KICA8bGluZSB4MT0iNjcyLjMiIHkxPSIzOC4wIiB4Mj0iNjcyLjMiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNjUiLz4KICA8dGV4dCB4PSI2NzIuMyIgeT0iNDIxLjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTEiPiQyNTwvdGV4dD4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjM4LjAiIHgyPSI1NC4wIiB5Mj0iNDA0LjAiIHN0cm9rZT0iIzU5NTk1OSIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICA8bGluZSB4MT0iNTQuMCIgeTE9IjQwNC4wIiB4Mj0iNzIwLjAiIHkyPSI0MDQuMCIgc3Ryb2tlPSIjNTk1OTU5IiBzdHJva2Utd2lkdGg9IjEuMiIvPgogIDx0ZXh0IHg9IjM4Ny4wIiB5PSI0MzguMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjYwMCI+Q2VuYSB6YSDDumxvaHUg4oCUIENvc3QgcGVyIFRhc2sgKFVTRCwgbG9nYXJpdG1pY2vDoSBvc2EpPC90ZXh0PgogIDx0ZXh0IHg9IjE2IiB5PSIyMjEuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjYwMCIgdHJhbnNmb3JtPSJyb3RhdGUoLTkwIDE2IDIyMS4wKSI+SW50ZWxsaWdlbmNlIEluZGV4PC90ZXh0PgogIDxwYXRoIGQ9Ik0gODUuNCAzNzQuMSBMIDE1Ni44IDMzMi44IEwgMTkyLjkgMjU1LjYgTCAyMTIuOCAyNDIuMSBMIDI5My41IDE0Ni4wIEwgMzc3LjcgMTEzLjUgTCA1MDMuOCA4MC40IEwgNjc3LjggNjMuMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDBhNGVmIiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWRhc2hhcnJheT0iNiA0IiBvcGFjaXR5PSIwLjkyIi8+CiAgPCEtLSBSZWFzb25pbmcgcmFuZ2UgY29ubmVjdG9ycyAobWVkIC0+IG1heC94aGlnaCkgLS0+CiAgPGxpbmUgeDE9Ijg1LjQiIHkxPSIzNzQuMSIgeDI9IjIwMy4yIiB5Mj0iMzExLjAiIHN0cm9rZT0iI2YyZjJmMiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSIyMTIuOCIgeTE9IjI0Mi4xIiB4Mj0iMzcyLjciIHkyPSIxNTIuOSIgc3Ryb2tlPSIjZjJmMmYyIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjI5My41IiB5MT0iMTQ2LjAiIHgyPSIzNzcuNyIgeTI9IjExMy41IiBzdHJva2U9IiNmMmYyZjIiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNDIwLjYiIHkxPSIxMTQuOSIgeDI9IjUwMy44IiB5Mj0iODAuNCIgc3Ryb2tlPSIjZjJmMmYyIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjE1Ni44IiB5MT0iMzMyLjgiIHgyPSIyOTQuNiIgeTI9IjI1Mi43IiBzdHJva2U9IiNkNDYzM2YiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iMzUzLjYiIHkxPSIyOTAuNyIgeDI9IjU4OC4zIiB5Mj0iMTMwLjUiIHN0cm9rZT0iI2Q0NjMzZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0NTguOCIgeTE9IjE3My45IiB4Mj0iNTg4LjQiIHkyPSIxMDEuMCIgc3Ryb2tlPSIjZDQ2MzNmIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjQ5OS4yIiB5MT0iMTE5LjgiIHgyPSI2NzcuOCIgeTI9IjYzLjEiIHN0cm9rZT0iI2Q0NjMzZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSIzNTUuNiIgeTE9IjIyMS44IiB4Mj0iNDgyLjIiIHkyPSIxMzQuOSIgc3Ryb2tlPSIjMTY5YzUyIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPGxpbmUgeDE9IjU0OS43IiB5MT0iMTA2LjEiIHgyPSI1NjQuNyIgeTI9Ijk0LjIiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0MzUuNiIgeTE9IjEyOS4yIiB4Mj0iNTQ3LjciIHkyPSI4NC43IiBzdHJva2U9IiMxNjljNTIiIHN0cm9rZS13aWR0aD0iMS41IiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNDc1LjAiIHkxPSIyODguOSIgeDI9IjU2NC45IiB5Mj0iMjYwLjUiIHN0cm9rZT0iIzdjNmJlNiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNSIvPgogIDxsaW5lIHgxPSI0MDguMSIgeTE9IjM0My4wIiB4Mj0iNDQyLjkiIHkyPSIzMjIuNiIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC41Ii8+CiAgPCEtLSBMZWFkZXIgbGluZXMgLS0+CiAgPGxpbmUgeDE9IjU4OC40IiB5MT0iMTAxLjAiIHgyPSI2MDguNCIgeTI9IjExMC41IiBzdHJva2U9IiNkNDYzM2YiIHN0cm9rZS13aWR0aD0iMS4wIiBzdHJva2UtZGFzaGFycmF5PSIyIDIiIG9wYWNpdHk9IjAuNjgiLz4KICA8bGluZSB4MT0iNDgyLjIiIHkxPSIxMzQuOSIgeDI9IjQ5Ny4yIiB5Mj0iMTUzLjQiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI1NjQuNyIgeTE9Ijk0LjIiIHgyPSI2MDguNyIgeTI9Ijk0LjciIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI1NDcuNyIgeTE9Ijg0LjciIHgyPSI2MDEuNyIgeTI9Ijc5LjIiIHN0cm9rZT0iIzE2OWM1MiIgc3Ryb2tlLXdpZHRoPSIxLjAiIHN0cm9rZS1kYXNoYXJyYXk9IjIgMiIgb3BhY2l0eT0iMC42OCIvPgogIDxsaW5lIHgxPSI0MjguOCIgeTE9IjM0My4xIiB4Mj0iNDM3LjgiIHkyPSIzNTUuNiIgc3Ryb2tlPSIjMjU2M2ViIiBzdHJva2Utd2lkdGg9IjEuMCIgc3Ryb2tlLWRhc2hhcnJheT0iMiAyIiBvcGFjaXR5PSIwLjY4Ii8+CiAgPCEtLSBEYXRhIHBvaW50cyAtLT4KICA8Y2lyY2xlIGN4PSIyMDMuMiIgY3k9IjMxMS4wIiByPSI0LjgiIGZpbGw9IiNmMmYyZjIiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjM3Mi43IiBjeT0iMTUyLjkiIHI9IjQuOCIgZmlsbD0iI2YyZjJmMiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDIwLjYiIGN5PSIxMTQuOSIgcj0iMy43IiBmaWxsPSIjZjJmMmYyIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSIyOTQuNiIgY3k9IjI1Mi43IiByPSI0LjgiIGZpbGw9IiNkNDYzM2YiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjM1My42IiBjeT0iMjkwLjciIHI9IjMuNyIgZmlsbD0iI2Q0NjMzZiIgZmlsbC1vcGFjaXR5PSIwLjc0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNTg4LjMiIGN5PSIxMzAuNSIgcj0iNC44IiBmaWxsPSIjZDQ2MzNmIiBmaWxsLW9wYWNpdHk9IjAuOTQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI0NTguOCIgY3k9IjE3My45IiByPSIzLjciIGZpbGw9IiNkNDYzM2YiIGZpbGwtb3BhY2l0eT0iMC43NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjU4OC40IiBjeT0iMTAxLjAiIHI9IjQuOCIgZmlsbD0iI2Q0NjMzZiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDk5LjIiIGN5PSIxMTkuOCIgcj0iMy43IiBmaWxsPSIjZDQ2MzNmIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSIzNTUuNiIgY3k9IjIyMS44IiByPSIzLjciIGZpbGw9IiMxNjljNTIiIGZpbGwtb3BhY2l0eT0iMC43NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxjaXJjbGUgY3g9IjQ4Mi4yIiBjeT0iMTM0LjkiIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNTQ5LjciIGN5PSIxMDYuMSIgcj0iMy43IiBmaWxsPSIjMTY5YzUyIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NjQuNyIgY3k9Ijk0LjIiIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDM1LjYiIGN5PSIxMjkuMiIgcj0iMy43IiBmaWxsPSIjMTY5YzUyIiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NDcuNyIgY3k9Ijg0LjciIHI9IjQuOCIgZmlsbD0iIzE2OWM1MiIgZmlsbC1vcGFjaXR5PSIwLjk0IiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPGNpcmNsZSBjeD0iNDc1LjAiIGN5PSIyODguOSIgcj0iMy43IiBmaWxsPSIjN2M2YmU2IiBmaWxsLW9wYWNpdHk9IjAuNzQiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8Y2lyY2xlIGN4PSI1NjQuOSIgY3k9IjI2MC41IiByPSI0LjgiIGZpbGw9IiM3YzZiZTYiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxwb2x5Z29uIHBvaW50cz0iNDk2LjIsMTc5LjggNTAxLjgsMTg1LjQgNDk2LjIsMTkxLjAgNDkwLjYsMTg1LjQiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iIzA4OTFiMiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8cG9seWdvbiBwb2ludHM9IjMyOS43LDI3NC44IDMzNS4zLDI4MC40IDMyOS43LDI4Ni4wIDMyNC4xLDI4MC40IiBmaWxsPSIjMTkxOTE5IiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iMi4xIi8+CiAgPHBvbHlnb24gcG9pbnRzPSI0MjguOCwzMzcuNSA0MzQuNCwzNDMuMSA0MjguOCwzNDguNyA0MjMuMiwzNDMuMSIgZmlsbD0iIzE5MTkxOSIgc3Ryb2tlPSIjMjU2M2ViIiBzdHJva2Utd2lkdGg9IjIuMSIvPgogIDxwb2x5Z29uIHBvaW50cz0iNTI0LjUsMjgwLjUgNTMwLjEsMjg2LjEgNTI0LjUsMjkxLjcgNTE4LjksMjg2LjEiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iIzBlYTVlOSIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8cG9seWdvbiBwb2ludHM9IjI1MS41LDI5MS40IDI1Ny4xLDI5Ny4wIDI1MS41LDMwMi42IDI0NS45LDI5Ny4wIiBmaWxsPSIjMTkxOTE5IiBzdHJva2U9IiNmOTczMTYiIHN0cm9rZS13aWR0aD0iMi4xIi8+CiAgPHBvbHlnb24gcG9pbnRzPSI0MDguMSwzMzguNiA0MTIuNSwzNDMuMCA0MDguMSwzNDcuNCA0MDMuNywzNDMuMCIgZmlsbD0iIzE5MTkxOSIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjIuMSIvPgogIDxwb2x5Z29uIHBvaW50cz0iNDQyLjksMzE3LjAgNDQ4LjUsMzIyLjYgNDQyLjksMzI4LjIgNDM3LjMsMzIyLjYiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iI2UxMWQ0OCIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8Y2lyY2xlIGN4PSI0ODUuMiIgY3k9IjIxMC43IiByPSI0LjgiIGZpbGw9IiNkOTc3MDYiIGZpbGwtb3BhY2l0eT0iMC45NCIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuMyIvPgogIDxwb2x5Z29uIHBvaW50cz0iMzI0LjksMzAxLjIgMzMwLjUsMzA2LjggMzI0LjksMzEyLjQgMzE5LjMsMzA2LjgiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iI2Q5NzcwNiIgc3Ryb2tlLXdpZHRoPSIyLjEiLz4KICA8Y2lyY2xlIGN4PSI4NS40IiBjeT0iMzc0LjEiIHI9IjkuMCIgZmlsbD0iIzAwYTRlZiIgb3BhY2l0eT0iMC4xNyIvPgogIDxjaXJjbGUgY3g9Ijg1LjQiIGN5PSIzNzQuMSIgcj0iNS42IiBmaWxsPSIjZjJmMmYyIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMjEyLjgiIGN5PSIyNDIuMSIgcj0iOS4wIiBmaWxsPSIjMDBhNGVmIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMjEyLjgiIGN5PSIyNDIuMSIgcj0iNS42IiBmaWxsPSIjZjJmMmYyIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMjkzLjUiIGN5PSIxNDYuMCIgcj0iOS4wIiBmaWxsPSIjMDBhNGVmIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMjkzLjUiIGN5PSIxNDYuMCIgcj0iNS42IiBmaWxsPSIjZjJmMmYyIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iMzc3LjciIGN5PSIxMTMuNSIgcj0iOS4wIiBmaWxsPSIjMDBhNGVmIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iMzc3LjciIGN5PSIxMTMuNSIgcj0iNS42IiBmaWxsPSIjZjJmMmYyIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS43Ii8+CiAgPGNpcmNsZSBjeD0iNTAzLjgiIGN5PSI4MC40IiByPSI5LjAiIGZpbGw9IiMwMGE0ZWYiIG9wYWNpdHk9IjAuMTciLz4KICA8Y2lyY2xlIGN4PSI1MDMuOCIgY3k9IjgwLjQiIHI9IjUuNiIgZmlsbD0iI2YyZjJmMiIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuNyIvPgogIDxjaXJjbGUgY3g9IjE1Ni44IiBjeT0iMzMyLjgiIHI9IjkuMCIgZmlsbD0iIzAwYTRlZiIgb3BhY2l0eT0iMC4xNyIvPgogIDxjaXJjbGUgY3g9IjE1Ni44IiBjeT0iMzMyLjgiIHI9IjUuNiIgZmlsbD0iI2Q0NjMzZiIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjEuNyIvPgogIDxjaXJjbGUgY3g9IjY3Ny44IiBjeT0iNjMuMSIgcj0iOS4wIiBmaWxsPSIjMDBhNGVmIiBvcGFjaXR5PSIwLjE3Ii8+CiAgPGNpcmNsZSBjeD0iNjc3LjgiIGN5PSI2My4xIiByPSI1LjYiIGZpbGw9IiNkNDYzM2YiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjciLz4KICA8Y2lyY2xlIGN4PSIxOTIuOSIgY3k9IjI1NS42IiByPSI5LjAiIGZpbGw9IiMwMGE0ZWYiIG9wYWNpdHk9IjAuMTciLz4KICA8Y2lyY2xlIGN4PSIxOTIuOSIgY3k9IjI1NS42IiByPSI1LjYiIGZpbGw9IiMwMjg0YzciIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIxLjciLz4KICA8IS0tIExhYmVscyAtLT4KICA8dGV4dCB4PSI5Ni40IiB5PSIzODguMSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjExLjMiIGZvbnQtd2VpZ2h0PSI3MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdQVC02IEx1bmEgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iMjEzLjIiIHk9IjMyMi4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+THVuYSAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSIyMDAuOCIgeT0iMjM0LjEiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNmMmYyZjIiIGZvbnQtc2l6ZT0iMTEuMyIgZm9udC13ZWlnaHQ9IjcwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R1BULTYuMSBUZXJyYSAobWVkKTwvdGV4dD4KICA8dGV4dCB4PSIzNjIuNyIgeT0iMTY2LjkiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+VGVycmEgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iMjgxLjUiIHk9IjE0OC4wIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjExLjMiIGZvbnQtd2VpZ2h0PSI3MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdQVC02LjIgU29sIChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjM2NS43IiB5PSIxMDYuNSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2YyZjJmMiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5HUFQtNi4yIFNvbCAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSI0MjcuNiIgeT0iMTA0LjkiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Bc3RyYSAobWVkKTwvdGV4dD4KICA8dGV4dCB4PSI0OTIuOCIgeT0iNjkuNCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2YyZjJmMiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5HUFQtNi4yIEFzdHJhIChtYXgpPC90ZXh0PgogIDx0ZXh0IHg9IjE0NS44IiB5PSIzMjkuOCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2YyZjJmMiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5IYWlrdSA1LjUgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iMzAzLjYiIHk9IjI1Ni43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+SGFpa3UgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iMzYyLjYiIHk9IjI5Ni43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+U29ubmV0IChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjU5OS4zIiB5PSIxMzUuNSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPlNvbm5ldCA1LjUgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iNDQ4LjgiIHk9IjE3OC45IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk9wdXMgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNjExLjQiIHk9IjExNC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+T3B1cyA1LjUgKG1heCk8L3RleHQ+CiAgPHRleHQgeD0iNTA4LjUiIHk9IjEyOC41IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+RmFibGUgKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNzA5LjgiIHk9IjQ5LjEiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNmMmYyZjIiIGZvbnQtc2l6ZT0iMTEuMyIgZm9udC13ZWlnaHQ9IjcwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+Q2xhdWRlIEZhYmxlIDUuMiAobWF4KTwvdGV4dD4KICA8dGV4dCB4PSIzNDUuNiIgeT0iMjI1LjgiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+SHlkcm9nZW4gKG1lZCk8L3RleHQ+CiAgPHRleHQgeD0iNTAwLjIiIHk9IjE1Ni45IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R2VtaW5pIDQgSHlkcm9nZW4gKHhoKTwvdGV4dD4KICA8dGV4dCB4PSI1NTYuNyIgeT0iMTE5LjEiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iI2EwYTBhMCIgZm9udC1zaXplPSI5LjIiIGZvbnQtd2VpZ2h0PSI1MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPm1lZDwvdGV4dD4KICA8dGV4dCB4PSI2MTEuNyIgeT0iOTguMiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdlbWluaSA0IENhcmJvbiAoaGkpPC90ZXh0PgogIDx0ZXh0IHg9IjQyNi42IiB5PSIxNDIuMiIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5OZW9uIChtZWQpPC90ZXh0PgogIDx0ZXh0IHg9IjYwNC43IiB5PSI4Mi43IiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNmMmYyZjIiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjY1MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+R2VtaW5pIDQgTmVvbiAoeGgpPC90ZXh0PgogIDx0ZXh0IHg9IjQ2Ny4wIiB5PSIzMDAuOSIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2EwYTBhMCIgZm9udC1zaXplPSI5LjIiIGZvbnQtd2VpZ2h0PSI1MDAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPmxvdzwvdGV4dD4KICA8dGV4dCB4PSI1NzQuOSIgeT0iMjY0LjUiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iI2YyZjJmMiIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNjUwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Hcm9rIDQuNyAoeGgpPC90ZXh0PgogIDx0ZXh0IHg9IjE4MC45IiB5PSIyNjUuNiIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iI2YyZjJmMiIgZm9udC1zaXplPSIxMS4zIiBmb250LXdlaWdodD0iNzAwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5NdXNlIEVtYmVyIChtYXgpPC90ZXh0PgogIDx0ZXh0IHg9IjUwNi4yIiB5PSIxODkuNCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI2NTAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPktpbWkgSzMuMSBQcm88L3RleHQ+CiAgPHRleHQgeD0iMzE5LjciIHk9IjI3My40IiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkRlZXBTZWVrIFY0LjEgRmxhc2g8L3RleHQ+CiAgPHRleHQgeD0iNDQwLjgiIHk9IjM1OS4xIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuMiIgZm9udC13ZWlnaHQ9IjU3MCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+RGVlcFNlZWsgVjQgUHJvPC90ZXh0PgogIDx0ZXh0IHg9IjUzNC41IiB5PSIyOTAuMSIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPkdMTS01LjM8L3RleHQ+CiAgPHRleHQgeD0iMjQ3LjUiIHk9IjI4Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk1pTW8tVjIuNi1Qcm88L3RleHQ+CiAgPHRleHQgeD0iMzk5LjEiIHk9IjM0Ny4wIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjYTBhMGEwIiBmb250LXNpemU9IjkuMiIgZm9udC13ZWlnaHQ9IjUwMCIgcGFpbnQtb3JkZXI9InN0cm9rZSIgc3Ryb2tlPSIjMTkxOTE5IiBzdHJva2Utd2lkdGg9IjMuNiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+bWVkPC90ZXh0PgogIDx0ZXh0IHg9IjQ1Mi45IiB5PSIzMjYuNiIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI2NTAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPk1pc3RyYWwgTGFyZ2UgNCAoRVUpPC90ZXh0PgogIDx0ZXh0IHg9IjQ5NS4yIiB5PSIyMTQuNyIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjIiIGZvbnQtd2VpZ2h0PSI1NzAiIHBhaW50LW9yZGVyPSJzdHJva2UiIHN0cm9rZT0iIzE5MTkxOSIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPlF3ZW40IE1heDwvdGV4dD4KICA8dGV4dCB4PSIzMzQuOSIgeT0iMzE3LjgiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC4yIiBmb250LXdlaWdodD0iNTcwIiBwYWludC1vcmRlcj0ic3Ryb2tlIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIj5Rd2VuMy44LUZsYXNoPC90ZXh0PgogIDxsaW5lIHgxPSIxOCIgeTE9IjQ0NiIgeDI9IjcyMiIgeTI9IjQ0NiIgc3Ryb2tlPSIjMzYzNjM2IiBzdHJva2Utd2lkdGg9IjEiLz4KICA8Y2lyY2xlIGN4PSIyNCIgY3k9IjQ2MCIgcj0iNC40IiBmaWxsPSIjZjJmMmYyIi8+CiAgPHRleHQgeD0iMzMiIHk9IjQ2My44IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjgiPk9wZW5BSTwvdGV4dD4KICA8Y2lyY2xlIGN4PSI5MiIgY3k9IjQ2MCIgcj0iNC40IiBmaWxsPSIjZDQ2MzNmIi8+CiAgPHRleHQgeD0iMTAxIiB5PSI0NjMuOCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC44Ij5BbnRocm9waWM8L3RleHQ+CiAgPGNpcmNsZSBjeD0iMTc0IiBjeT0iNDYwIiByPSI0LjQiIGZpbGw9IiMxNjljNTIiLz4KICA8dGV4dCB4PSIxODMiIHk9IjQ2My44IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjgiPkdvb2dsZTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIyNDIiIGN5PSI0NjAiIHI9IjQuNCIgZmlsbD0iIzdjNmJlNiIvPgogIDx0ZXh0IHg9IjI1MSIgeT0iNDYzLjgiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuOCI+eEFJIChHcm9rKTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIzMjYiIGN5PSI0NjAiIHI9IjQuNCIgZmlsbD0iIzAyODRjNyIvPgogIDx0ZXh0IHg9IjMzNSIgeT0iNDYzLjgiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuOCI+TWV0YTwvdGV4dD4KICA8cG9seWdvbiBwb2ludHM9IjM4Niw0NTUuNCAzOTAuNiw0NjAgMzg2LDQ2NC42IDM4MS40LDQ2MCIgZmlsbD0iIzE5MTkxOSIgc3Ryb2tlPSIjZTExZDQ4IiBzdHJva2Utd2lkdGg9IjEuOSIvPgogIDx0ZXh0IHg9IjM5NSIgeT0iNDYzLjgiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuOCI+TWlzdHJhbCAoRVUpPC90ZXh0PgogIDxwb2x5Z29uIHBvaW50cz0iNDgwLDQ1NS40IDQ4NC42LDQ2MCA0ODAsNDY0LjYgNDc1LjQsNDYwIiBmaWxsPSIjMTkxOTE5IiBzdHJva2U9IiMyNTYzZWIiIHN0cm9rZS13aWR0aD0iMS45Ii8+CiAgPHRleHQgeD0iNDg5IiB5PSI0NjMuOCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC44Ij5LaW1pIC8gRGVlcFNlZWsgLyBHTE08L3RleHQ+CiAgPHBvbHlnb24gcG9pbnRzPSI2MzIsNDU1LjQgNjM2LjYsNDYwIDYzMiw0NjQuNiA2MjcuNCw0NjAiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iI2Y5NzMxNiIgc3Ryb2tlLXdpZHRoPSIxLjkiLz4KICA8dGV4dCB4PSI2NDEiIHk9IjQ2My44IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjgiPk1pTW8gLyBRd2VuPC90ZXh0PgogIDxsaW5lIHgxPSIyMCIgeTE9IjQ4NCIgeDI9IjQ0IiB5Mj0iNDg0IiBzdHJva2U9IiMwMGE0ZWYiIHN0cm9rZS13aWR0aD0iMi4zIiBzdHJva2UtZGFzaGFycmF5PSI1IDMiLz4KICA8Y2lyY2xlIGN4PSIzMiIgY3k9IjQ4NCIgcj0iNC4yIiBmaWxsPSIjZjJmMmYyIiBzdHJva2U9IiMxOTE5MTkiIHN0cm9rZS13aWR0aD0iMS4zIi8+CiAgPHRleHQgeD0iNTEiIHk9IjQ4Ny44IiBmaWxsPSIjZjJmMmYyIiBmb250LXNpemU9IjEwLjgiIGZvbnQtd2VpZ2h0PSI2NjAiPlBhcmV0byBocmFuaWNlICh0dcSNbsSbKTwvdGV4dD4KICA8Y2lyY2xlIGN4PSIyMDQiIGN5PSI0ODQiIHI9IjQuNCIgZmlsbD0iI2I1YjViNSIvPgogIDx0ZXh0IHg9IjIxNCIgeT0iNDg3LjgiIGZpbGw9IiNiNWI1YjUiIGZvbnQtc2l6ZT0iMTAuOCI+UHJvcHJpZXTDoXJuw608L3RleHQ+CiAgPHBvbHlnb24gcG9pbnRzPSIzMDAsNDc5LjIgMzA0LjgsNDg0IDMwMCw0ODguOCAyOTUuMiw0ODQiIGZpbGw9IiMxOTE5MTkiIHN0cm9rZT0iI2I1YjViNSIgc3Ryb2tlLXdpZHRoPSIxLjkiLz4KICA8dGV4dCB4PSIzMTAiIHk9IjQ4Ny44IiBmaWxsPSIjYjViNWI1IiBmb250LXNpemU9IjEwLjgiPk9wZW4tV2VpZ2h0czwvdGV4dD4KICA8Y2lyY2xlIGN4PSI0MTQiIGN5PSI0ODQiIHI9IjMuNCIgZmlsbD0iI2I1YjViNSIgb3BhY2l0eT0iMC43MiIvPgogIDxsaW5lIHgxPSI0MTciIHkxPSI0ODQiIHgyPSI0NDEiIHkyPSI0ODQiIHN0cm9rZT0iI2I1YjViNSIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNiIvPgogIDxjaXJjbGUgY3g9IjQ0MyIgY3k9IjQ4NCIgcj0iNC42IiBmaWxsPSIjYjViNWI1Ii8+CiAgPHRleHQgeD0iNDUzIiB5PSI0ODcuOCIgZmlsbD0iI2I1YjViNSIgZm9udC1zaXplPSIxMC44Ij5Sb3pwxJt0w60gcmVhc29uaW5ndSAobWVkIOKGkiBtYXggLyB4aGlnaCk8L3RleHQ+Cjwvc3ZnPgo=" width="740" height="504" alt="Artificial Analysis: Intelligence Index v5.0.2 vs. Cost per Task (Pareto optimal frontier)">
+        </figure>
+        <div>
+          <span class="col-label">Pareto optimal frontier</span>
+          <ul>
+            <li>Uzavřený model nemusí být drahý — viz GPT-6 Luna a Haiku 5.5.</li>
+            <li>Cenu určují všechny spálené tokeny včetně uvažování (med → max).</li>
+            <li>Open-weights nejsou zdarma: Kimi K3.1 Pro (1,56 TB vah) vyžaduje 16× H200/B200 v DC.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="slide-note">Zdroj dat: Artificial Analysis — https://artificialanalysis.ai (Intelligence Index v5.0.2, 25. 11. 2026)</p>
+    </div>
+  </section>
+
+  <!-- 14. Auto routing, Copilot Fusion & MAI -->
+  <section class="slide" id="s-auto-fusion">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Směrování a MAI</p>
+      <h2 class="slide-title">Auto, Fusion a modely MAI</h2>
+    </div>
+    <div class="slide-body">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span class="summary-label">M365 Auto</span>
+          Volí model i uvažování podle zadání.
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">GITHUB COPILOT FUSION (GA)</span>
+          Standard/High/Max; Fusion Max −51 % ($5,59 vs. $11,42).
+        </div>
+        <div class="summary-item summary-item--wide">
+          <span class="summary-label">Microsoft AI modely a vlastní váhy</span>
+          <ul>
+            <li><strong>Modely:</strong> Code-2 (GitHub GA), Cyber-2-Flash, Image-2.7, Voice-3, Realtime-1, Decision 1.1.</li>
+            <li><strong>Fine-tuning:</strong> specializace (Excel) zlevňuje AI až 10×.</li>
+            <li><strong>Výhled:</strong> velké MAI, licencování vah a izolovaný trénink v tenantu.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. Better together -->
+  <section class="slide" id="s-better-together">
+    <div class="slide-head">
+      <p class="slide-eyebrow">Společně v jedné firmě</p>
+      <h2 class="slide-title">Obě strany mince se v praxi doplňují</h2>
+    </div>
+    <div class="slide-body">
+      <ol class="steps">
+        <li>
+          <h3>Začněte v M365 SaaS</h3>
+          <p>Workspaces, Autopilot a Studio pokryjí týmové scénáře bez složitého provozu.</p>
+        </li>
+        <li>
+          <h3>Specializujte přes Foundry a OSS</h3>
+          <p>Znalostní báze, pokročilé scénáře, otevřenost a integrace, hill-climbing.</p>
+        </li>
+        <li>
+          <h3>Jednotná UX a multi-model</h3>
+          <p>Auto, Fusion a MAI hlídají kvalitu i cenu.</p>
+        </li>
+        <li>
+          <h3>Řízení a bezpečnost s Agent 365</h3>
+          <p>Governance agentů napříč prostředími, ať běží kdekoli.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 15. Closing -->
+  <section class="slide slide--end" id="s-end">
+    <p>Jedna zkušenost pro lidi.<br><em>Svoboda volby pod kapotou.</em></p>
+  </section>
+
+</main>
+
+</body>
+</html>

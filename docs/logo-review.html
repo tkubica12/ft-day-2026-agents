@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="cs" data-default-accent="green">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Javorna — tři finální loga</title>
+<meta name="description" content="ONE SENTENCE SUMMARY">
+<!-- Stable key for read-progress storage. Keep it if this document may be
+     served from more than one path; delete it and the pathname is used. -->
+<meta name="doc-id" content="ft2026-logo-review">
+
+<!-- 1. Theme bootstrap. Must be the first script in <head>. -->
+<script data-doc-bootstrap>
+/* Inline in the head before styles with sync-head.js. No deferred bootstrap. */
+(() => {
+  "use strict";
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const id = document.querySelector('meta[name="doc-id"]')?.content ||
+    location.pathname.replace(/\.standalone(?=\.html$)/i, "");
+  const prefix = "html-docs:" + id + ":";
+  const choices = { theme: ["light", "dark"], accent: ["blue", "red", "green", "yellow"],
+    "print-theme": ["light", "dark"] };
+  const read = (name) => {
+    try { return localStorage.getItem(prefix + name); }
+    catch { return null; /* Storage may be unavailable for local files. */ }
+  };
+  const write = (name, value) => {
+    try { localStorage.setItem(prefix + name, value); }
+    catch { /* The current view still works without persistence. */ }
+  };
+  function refresh() {
+    for (const name of Object.keys(choices)) {
+      const current = root.getAttribute("data-" + name);
+      const next = choices[name][(choices[name].indexOf(current) + 1) % choices[name].length];
+      document.querySelectorAll('[data-action="toggle-' + name + '"]').forEach(button => {
+        button.textContent = name === "print-theme" ? "PDF theme: " + (current === "dark" ? "Dark" : "Light") :
+          name === "theme" ? (next === "dark" ? "Dark" : "Light") :
+          "Accent: " + current[0].toUpperCase() + current.slice(1);
+        button.setAttribute("aria-label", name === "print-theme" ? "PDF theme: " + current + ". Switch to " + next :
+          name === "theme" ? "Switch to " + next + " theme" :
+          "Accent: " + current + ". Switch to " + next);
+      });
+    }
+  }
+  for (const [name, values] of Object.entries(choices)) {
+    const fallback = name === "theme" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : values[0];
+    const value = [params.get(name), read(name),
+      root.getAttribute(name === "print-theme" ? "data-print-theme" : "data-default-" + name), fallback]
+      .map(candidate => name === "accent" && candidate === "orange" ? "red" : candidate)
+      .find(candidate => values.includes(candidate));
+    root.setAttribute("data-" + name, value);
+  }
+  root.classList.add("js");
+  if (["slides", "sheet"].includes(params.get("view"))) root.setAttribute("data-view", params.get("view"));
+
+  // Print what is on screen. data-print selects the matching print stylesheet.
+  const printTarget = () => {
+    if (document.querySelector(".deck-stage")) return "slides";
+    const view = root.getAttribute("data-view");
+    if (view === "slides" || (view === "sheet" && document.querySelector(".sheet"))) return view;
+    return document.querySelector(".doc") || !document.querySelector(".sheet") ? "read" : "sheet";
+  };
+  let printing = null;
+  addEventListener("beforeprint", () => {
+    if (root.hasAttribute("data-print")) return; // Set by an automated export.
+    const target = printTarget();
+    printing = document.title;
+    root.setAttribute("data-print", target);
+    // The browser proposes the title as the PDF file name.
+    if (target !== "read" && document.querySelector(".doc")) {
+      document.title += target === "slides" ? " - Slides" : " - Sheet";
+    }
+  });
+  addEventListener("afterprint", () => {
+    if (printing === null) return;
+    root.removeAttribute("data-print");
+    document.title = printing;
+    printing = null;
+  });
+
+  // Keep the display awake while presenting, like presentation software does.
+  let lock = null;
+  let awake = false;
+  async function holdScreen() {
+    if (!awake || lock || document.visibilityState !== "visible" || !navigator.wakeLock) return;
+    try {
+      const sentinel = await navigator.wakeLock.request("screen");
+      if (!awake || lock) { sentinel.release(); return; }
+      lock = sentinel;
+      root.setAttribute("data-awake", "");
+      sentinel.addEventListener("release", () => {
+        if (lock !== sentinel) return;
+        lock = null;
+        root.removeAttribute("data-awake");
+      });
+    } catch { /* Denied by battery saver or an embedding policy; retried on input. */ }
+  }
+  function keepAwake(on) {
+    awake = !!on;
+    if (awake) holdScreen();
+    else if (lock) lock.release();
+  }
+  // The browser drops the lock when the tab is hidden; some require a gesture.
+  document.addEventListener("visibilitychange", holdScreen);
+  document.addEventListener("pointerdown", holdScreen);
+  document.addEventListener("keydown", holdScreen);
+
+  window.HtmlDocs = { read, write, refresh, keepAwake };
+  document.addEventListener("DOMContentLoaded", refresh);
+  document.addEventListener("click", event => {
+    if (event.target.closest('[data-action="print"]')) window.print();
+  });
+  document.addEventListener("click", event => {
+    const button = event.target.closest('[data-action="toggle-theme"], [data-action="toggle-accent"], [data-action="toggle-print-theme"]');
+    if (!button) return;
+    const name = button.getAttribute("data-action").slice(7);
+    const values = choices[name];
+    const next = values[(values.indexOf(root.getAttribute("data-" + name)) + 1) % values.length];
+    root.setAttribute("data-" + name, next);
+    write(name, next);
+    // Replace a URL override too, so reloading preserves a deliberate change.
+    const url = new URL(location.href);
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, next);
+      history.replaceState(null, "", url.href);
+    }
+    refresh();
+  });
+})();
+</script>
+
+<!-- 2. Canonical design tokens. Copied verbatim from assets/tokens.css.
+     Never edit these values in a page. -->
+<style data-doc-tokens>
+/* Canonical tokens. Inline with sync-head.js; one accent family at a time. */
+:root {
+  color-scheme: light;
+  --bg: #fafafa; --surface: #ffffff; --surface-2: #f2f2f2; --surface-3: #e8e8e8;
+  --border: #dedede; --border-strong: #b8b8b8;
+  --text: #161616; --text-muted: #565656; --text-faint: #686868;
+  --accent-light: #006da0; --accent-dark: #00a4ef;
+  --accent: var(--accent-light);
+  --accent-strong: var(--accent);
+  --accent-quiet: var(--accent);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 36%, var(--bg));
+  --warn: var(--accent); --warn-soft: var(--accent-soft); --warn-border: var(--accent-border);
+  --code-bg: var(--surface-2); --code-border: var(--border);
+  --focus: var(--accent);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-2: 0 2px 4px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.06);
+  --radius: 10px; --radius-sm: 6px; --canvas: 1160px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", "Liberation Mono", Menlo, monospace;
+}
+/* Screen theme and print theme are independent; print stays light by default. */
+@media screen {
+  [data-theme="dark"], :root:not([data-theme])[data-default-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+@media print {
+  :root[data-print-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101010; --surface: #191919; --surface-2: #232323; --surface-3: #2c2c2c;
+    --border: #363636; --border-strong: #595959;
+    --text: #f2f2f2; --text-muted: #b5b5b5; --text-faint: #a0a0a0;
+    --accent: var(--accent-dark);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-2: 0 2px 4px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.4);
+  }
+}
+[data-accent="red"], :root:not([data-accent])[data-default-accent="red"],
+[data-accent="orange"], :root:not([data-accent])[data-default-accent="orange"] {
+  --accent-light: #bc3a16; --accent-dark: #f25022;
+}
+[data-accent="green"], :root:not([data-accent])[data-default-accent="green"] {
+  --accent-light: #4c7100; --accent-dark: #7fba00;
+}
+[data-accent="yellow"], :root:not([data-accent])[data-default-accent="yellow"] {
+  --accent-light: #805b00; --accent-dark: #ffb900;
+}
+</style>
+
+<!-- 3. Shared assets. Adjust the relative path to the assets folder.
+     sheet.css/js serve an optional companion sheet; keep them either way. -->
+<link rel="stylesheet" href="assets/article.css">
+<link rel="stylesheet" href="assets/slides.css">
+<link rel="stylesheet" href="assets/sheet.css">
+<script src="assets/article.js" defer></script>
+<script src="assets/slides.js" defer></script>
+<script src="assets/sheet.js" defer></script>
+<link rel="stylesheet" href="assets/furniture-review.css"><link rel="stylesheet" href="assets/logo-review.css"></head>
+
+<body>
+<div class="controls" role="group" aria-label="Vzhled stránky"><button type="button" class="ctrl" data-action="print">PDF</button><button type="button" class="ctrl" data-action="toggle-theme">Dark</button></div><div class="doc"><header class="doc-header"><p class="eyebrow">JAVORNA · LOGO · FINÁLNÍ VÝBĚR</p><h1>Tři židle, které stojí.</h1><p class="subtitle">16 návrhů ve 3 kolech. Konstrukce bez visících dílů. Paleta C.</p></header><main><div class="logo-finalists"><section class="logo-card" id="logo-1"><img class="logo-hero" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Logo 1 — Stuha"><div class="logo-copy"><p class="logo-path">Zjednodušeno — bez opěrky</p><h2>1 · Stuha</h2><p>Jedna plynulá skořepina z kouřového dubu se světlou vnitřní plochou. Nejblíž původnímu C.</p><p class="logo-pm"><span>+ Nejčitelnější i ve 32 px.</span><span>− Spíš designová ikona než luxusní kus.</span></p><div class="size-row"><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><div class="size-row dark"><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><a href="#study-1">Na slidech</a></div></section><section class="logo-card" id="logo-2"><img class="logo-hero" src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" alt="Logo 2 — Kapradí"><div class="logo-copy"><p class="logo-path">Zjednodušeno — bez opěrky</p><h2>2 · Kapradí</h2><p>Dubový rám a čalounění v jehličnaté zeleni. Logo samo nese barvu palety.</p><p class="logo-pm"><span>+ Zadní noha plynule přechází v opěradlo, přední nese sedák.</span><span>− Ve 32 px tmavý rám splývá.</span></p><div class="size-row"><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><div class="size-row dark"><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><a href="#study-2">Na slidech</a></div></section><section class="logo-card" id="logo-3"><img class="logo-hero" src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" alt="Logo 3 — Křeslo"><div class="logo-copy"><p class="logo-path">Opěrka zachována — 3D</p><h2>3 · Křeslo</h2><p>Tříčtvrteční pohled, přesně čtyři nohy. Opěrky nesou přední nohy a zadní sloupky.</p><p class="logo-pm"><span>+ Nejluxusnější, konstrukčně poctivé.</span><span>− Ve 32 px hodně detailů; favicon by chtěl zjednodušení.</span></p><div class="size-row"><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><div class="size-row dark"><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:128px;height:128px" alt="">128</span><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:64px;height:64px" alt="">64</span><span class="size"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" style="width:32px;height:32px" alt="">32</span></div><a href="#study-3">Na slidech</a></div></section></div><section class="review-direction" id="study-1"><h2>1 · Stuha</h2><div class="study-caption"><h3>Úvodní slide</h3><a href="logo-slides.html#s-1-title">Otevřít jako prezentaci</a></div><div class="study-frame" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><img class="title-photo" src="brand-candidates/workshop-hero-ed2912c5014e.png" width="2048" height="2048" alt="AI-generated fictional woodworking atelier"><div class="title-copy"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA<small>BESPOKE WOODWORK</small></div></div><h2 class="title-heading">Craft takes people.<br>Coordination<br>takes <em>Otto.</em></h2><p class="title-sub">One budget season.<br>Four countries. Clear boundaries.</p><p class="title-bottom"><strong>Tomáš Kubica · Microsoft</strong><br>Frontier Day 2026</p></div><p class="sample-tag">1 · Stuha</p></div><div class="study-caption"><h3>Obsahový slide</h3><a href="logo-slides.html#s-1-content">Otevřít jako prezentaci</a></div><div class="study-frame sample-content" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><div class="content-top"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA</div></div><p class="sample-kicker">Week three · same goal</p></div><h2 class="content-heading">A goal outlives a conversation.</h2><div class="country-grid"><div class="country-card"><h3>Submitted</h3><p>Czechia<br>Poland · Hungary</p></div><div class="country-card"><h3>Follow up</h3><p>Slovakia<br>Submission overdue</p></div><div class="country-card"><h3>Next step</h3><p>Emma prepares<br>challenge sessions</p></div></div><p class="sample-note"><strong>Otto coordinates.</strong> People keep the decision rights.</p><p class="sample-foot">Javorna Group · fictional scenario</p><p class="sample-tag">1 · Stuha</p></div></section><section class="review-direction" id="study-2"><h2>2 · Kapradí</h2><div class="study-caption"><h3>Úvodní slide</h3><a href="logo-slides.html#s-2-title">Otevřít jako prezentaci</a></div><div class="study-frame" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><img class="title-photo" src="brand-candidates/workshop-hero-ed2912c5014e.png" width="2048" height="2048" alt="AI-generated fictional woodworking atelier"><div class="title-copy"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA<small>BESPOKE WOODWORK</small></div></div><h2 class="title-heading">Craft takes people.<br>Coordination<br>takes <em>Otto.</em></h2><p class="title-sub">One budget season.<br>Four countries. Clear boundaries.</p><p class="title-bottom"><strong>Tomáš Kubica · Microsoft</strong><br>Frontier Day 2026</p></div><p class="sample-tag">2 · Kapradí</p></div><div class="study-caption"><h3>Obsahový slide</h3><a href="logo-slides.html#s-2-content">Otevřít jako prezentaci</a></div><div class="study-frame sample-content" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><div class="content-top"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA</div></div><p class="sample-kicker">Week three · same goal</p></div><h2 class="content-heading">A goal outlives a conversation.</h2><div class="country-grid"><div class="country-card"><h3>Submitted</h3><p>Czechia<br>Poland · Hungary</p></div><div class="country-card"><h3>Follow up</h3><p>Slovakia<br>Submission overdue</p></div><div class="country-card"><h3>Next step</h3><p>Emma prepares<br>challenge sessions</p></div></div><p class="sample-note"><strong>Otto coordinates.</strong> People keep the decision rights.</p><p class="sample-foot">Javorna Group · fictional scenario</p><p class="sample-tag">2 · Kapradí</p></div></section><section class="review-direction" id="study-3"><h2>3 · Křeslo</h2><div class="study-caption"><h3>Úvodní slide</h3><a href="logo-slides.html#s-3-title">Otevřít jako prezentaci</a></div><div class="study-frame" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><img class="title-photo" src="brand-candidates/workshop-hero-ed2912c5014e.png" width="2048" height="2048" alt="AI-generated fictional woodworking atelier"><div class="title-copy"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA<small>BESPOKE WOODWORK</small></div></div><h2 class="title-heading">Craft takes people.<br>Coordination<br>takes <em>Otto.</em></h2><p class="title-sub">One budget season.<br>Four countries. Clear boundaries.</p><p class="title-bottom"><strong>Tomáš Kubica · Microsoft</strong><br>Frontier Day 2026</p></div><p class="sample-tag">3 · Křeslo</p></div><div class="study-caption"><h3>Obsahový slide</h3><a href="logo-slides.html#s-3-content">Otevřít jako prezentaci</a></div><div class="study-frame sample-content" style="--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138"><div class="content-top"><div class="sample-lockup"><img class="sample-mark" src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" alt="Javorna furniture logo concept"><div class="sample-wordmark">JAVORNA</div></div><p class="sample-kicker">Week three · same goal</p></div><h2 class="content-heading">A goal outlives a conversation.</h2><div class="country-grid"><div class="country-card"><h3>Submitted</h3><p>Czechia<br>Poland · Hungary</p></div><div class="country-card"><h3>Follow up</h3><p>Slovakia<br>Submission overdue</p></div><div class="country-card"><h3>Next step</h3><p>Emma prepares<br>challenge sessions</p></div></div><p class="sample-note"><strong>Otto coordinates.</strong> People keep the decision rights.</p><p class="sample-foot">Javorna Group · fictional scenario</p><p class="sample-tag">3 · Křeslo</p></div></section><section class="review-direction widget-review" id="widgets"><h2>Widgety v Teams</h2><ul class="widget-rules"><li><strong>Dokument</strong> — z obsahového slidu. Brief, rozhodnutí, podklady.</li><li><strong>Čtverec</strong> — z úvodního slidu. Stav, souhrn, jedno velké číslo.</li><li><strong>Vizuály</strong> — malá schválená knihovna. Vkládá je brána podle ID, jen jako dekoraci záhlaví. Nikdy místo dat.</li></ul><div class="widget-gallery"><figure class="widget-shot"><article class="widget widget-doc"><div class="w-band"><img class="w-mark" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Javorna logo"><span class="w-word">JAVORNA</span><span class="w-kicker">FY2027 · Poland · private</span></div><div class="w-body"><div><h3 class="w-title">PL-CELL capex decision</h3><p class="w-meta">Decided by Adam Vávra, Group CFO · recorded by Otto · 23 Nov 2026</p></div><div class="w-kpis"><div class="w-kpi"><b>€0.60 M</b><span>PL-CELL approved</span></div><div class="w-kpi"><b>€1.10 M</b><span>Cap unchanged</span></div><div class="w-kpi"><b>FY2027</b><span>Only this year</span></div></div><table class="w-table"><thead><tr><th>Item</th><th>Before</th><th>Now</th></tr></thead><tbody><tr><td>PL-CELL line</td><td>€0.45 M</td><td>€0.60 M</td></tr><tr><td>Other Poland capex</td><td>as submitted</td><td>rebalance</td></tr><tr><td>Poland capex cap</td><td>€1.10 M</td><td>€1.10 M</td></tr></tbody></table><p class="w-text"><strong>Next:</strong> Piotr replaces the line and rebalances within the cap. Emma validates the revised submission.</p><p class="w-note"><strong>No blanket exemption.</strong> Replaces the €0.45 M line — not added to it.</p><div class="w-actions"><span class="w-btn">Open Poland submission</span><span class="w-btn ghost">Ask Otto</span></div></div></article><figcaption>Dokument · A4</figcaption></figure><figure class="widget-shot"><article class="widget widget-square"><div class="sq-top"><img class="w-mark" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Javorna logo"><span class="w-word">JAVORNA</span><span class="w-kicker">Week 3</span></div><p class="sq-big">3<small>/4</small></p><p class="sq-label">countries submitted their FY2027 budget</p><div class="sq-countries"><div class="sq-country"><b>CZ</b><span>Czechia</span><em>Submitted</em></div><div class="sq-country"><b>PL</b><span>Poland</span><em>Submitted</em></div><div class="sq-country"><b>HU</b><span>Hungary</span><em>Submitted</em></div><div class="sq-country open"><b>SK</b><span>Slovakia</span><em>Overdue</em></div></div><p class="sq-next"><b>Next</b> Validation · Challenge sessions 30 Nov – 3 Dec</p></article><figcaption>Infografika · čtverec</figcaption></figure><figure class="widget-shot"><article class="widget widget-announce"><div class="w-photo"><img class="photo" src="brand-candidates/workshop-hero-ed2912c5014e.png" width="2048" height="2048" alt=""><div class="w-photo-copy"><div class="sq-top"><img class="w-mark" src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" alt="Javorna logo"><span class="w-word">JAVORNA</span></div><h3 class="w-title">FY2027 budget season starts today.</h3></div></div><div class="w-body"><ul class="w-owners"><li><b>Adam Vávra</b><span>Decides exceptions</span></li><li><b>Emma Hartmann</b><span>Runs the process</span></li><li><b>Otto</b><span>Coordinates and follows up</span></li></ul><div class="w-timeline"><span><b>20 Nov</b>Submissions</span><span><b>Week 3</b>Validation</span><span><b>30 Nov</b>Challenge sessions</span></div><div class="w-actions"><span class="w-btn">Open calendar</span><span class="w-btn ghost">Ask Otto</span></div></div></article><figcaption>Oznámení · vizuál z knihovny</figcaption></figure></div><p class="widget-limits">Jen osobní chat s Otto · odpověď modelu max. 48 KB · obrázky jen <code>data:</code> · vizuál = malá zmenšená kopie, výslednou velikost zprávy ověříme v Teams.</p></section><section class="review-direction" id="iterations"><h2>Všech 16 iterací</h2><details class="iteration-log"><summary>Zobrazit vyřazené varianty</summary><h3>Kolo 1</h3><div class="iteration-grid"><figure class="iteration"><img src="brand-candidates/r1-s1-ribbon-c9e341614bc7.png" width="2048" height="2048" loading="lazy" alt="r1-s1-ribbon"><figcaption><code>r1-s1-ribbon</code>Dobrý směr, ale čte se jako lehátko.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r1-s2-planks-6dba905a3b4c.png" width="2048" height="2048" loading="lazy" alt="r1-s2-planks"><figcaption><code>r1-s2-planks</code>Dobré — dopracováno v kole 2.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r1-s3-shell-6b696c276a42.png" width="2048" height="2048" loading="lazy" alt="r1-s3-shell"><figcaption><code>r1-s3-shell</code>Čte se jako krabice nebo pohovka.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r1-d1-frame-fd8cbc839eb4.png" width="2048" height="2048" loading="lazy" alt="r1-d1-frame"><figcaption><code>r1-d1-frame</code>Pohled zezadu, jen jedna opěrka.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r1-d2-cushion-8c8eaa61b31a.png" width="2048" height="2048" loading="lazy" alt="r1-d2-cushion"><figcaption><code>r1-d2-cushion</code>Konstrukce sedí, ale přidal zelený pruh podlahy.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r1-d3-sideframe-0e8c8dffc39e.png" width="2048" height="2048" loading="lazy" alt="r1-d3-sideframe"><figcaption><code>r1-d3-sideframe</code>Nakloněná krabice.</figcaption></figure></div><h3>Kolo 2</h3><div class="iteration-grid"><figure class="iteration chosen"><img src="brand-candidates/r2-s1-ribbon-8726ad8be44c.png" width="2048" height="2048" loading="lazy" alt="r2-s1-ribbon"><figcaption><code>r2-s1-ribbon</code>Finalista 1.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r2-s2-planks-oak-915e375c1744.png" width="2048" height="2048" loading="lazy" alt="r2-s2-planks-oak"><figcaption><code>r2-s2-planks-oak</code>Boční lišta nedosedá na zadní nohu.</figcaption></figure><figure class="iteration chosen"><img src="brand-candidates/r2-s2-planks-pine-feb1821bf8fd.png" width="2048" height="2048" loading="lazy" alt="r2-s2-planks-pine"><figcaption><code>r2-s2-planks-pine</code>Finalista 2.</figcaption></figure><figure class="iteration chosen"><img src="brand-candidates/r2-d2-cushion-f0f04939aed6.png" width="2048" height="2048" loading="lazy" alt="r2-d2-cushion"><figcaption><code>r2-d2-cushion</code>Finalista 3.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r2-d2-wood-365c84574527.png" width="2048" height="2048" loading="lazy" alt="r2-d2-wood"><figcaption><code>r2-d2-wood</code>Nepřehledná konstrukce.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r2-d2-sculpted-91e222de9822.png" width="2048" height="2048" loading="lazy" alt="r2-d2-sculpted"><figcaption><code>r2-d2-sculpted</code>Baňaté, nefunkční nohy.</figcaption></figure></div><h3>Kolo 3</h3><div class="iteration-grid"><figure class="iteration"><img src="brand-candidates/r3-d2-oak-50618b09f533.png" width="2048" height="2048" loading="lazy" alt="r3-d2-oak"><figcaption><code>r3-d2-oak</code>Zkřížené opěrky, chaos.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r3-d2-bold-0174cc1986e1.png" width="2048" height="2048" loading="lazy" alt="r3-d2-bold"><figcaption><code>r3-d2-bold</code>Rozbité proporce.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r3-s1-pine-a48a5cdf18a7.png" width="2048" height="2048" loading="lazy" alt="r3-s1-pine"><figcaption><code>r3-s1-pine</code>Abstraktní, zelený blok podlahy.</figcaption></figure><figure class="iteration"><img src="brand-candidates/r3-s1-threequarter-f6369587fc97.png" width="2048" height="2048" loading="lazy" alt="r3-s1-threequarter"><figcaption><code>r3-s1-threequarter</code>Čisté 3D bez opěrky — náhradník, ale generický.</figcaption></figure></div></details></section></main><footer class="doc-footer"><span>Koncepty ke schválení · MAI 2.7 · původní PNG 2048 × 2048 · finální logo bude vektorové a průhledné</span></footer></div></body></html>

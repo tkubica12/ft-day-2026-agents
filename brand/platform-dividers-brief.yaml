@@ -1,0 +1,202 @@
+common_requirements: |
+  Photorealistic editorial architectural and studio photography for Javorna Group,
+  a fictional Czech bespoke luxury woodworking atelier. Quiet European luxury,
+  museum-grade craftsmanship, tactile natural European walnut, smoked oak, and
+  maple woodgrain, deep charcoal architectural surfaces, authentic natural lens
+  optics and subtle depth of field — never CGI plastic sheen, never neon AI clichés.
+  STRICT WIDESCREEN SLIDE COMPOSITION (16:9 native 3840x2160): Compose the primary
+  illuminated focal subject cleanly within the RIGHT 55 to 60 percent of the frame.
+  Keep the LEFT 40 to 45 percent calm, deeply shadowed, uncluttered dark
+  architectural plaster, slate, or dark shadowed timber wall so editable light
+  slide typography sits cleanly without colliding with visual detail.
+  No text, no lettering, no brand names, no company logos, no watermarks,
+  no readable screens, no recognizable celebrities or real people, no borders.
+size: 3840x2160
+quality: max
+instances_per_prompt: 1
+max_attempts: 3
+output_dir: ../.local/image-output
+azure:
+  subscription: 673af34d-6b28-41dc-bc7b-f507418045e6
+  account: tomaskubica-foundry-resource
+  resource_group: ai-services
+  deployment: gpt-image-2.5-sunburst
+  image_api_version: v1
+preferences:
+  detail: Ultra-detailed 4K photorealistic woodworking craft, architectural angles, and dramatic lighting.
+  realism: True editorial architectural/product photography shot on medium-format digital camera.
+  freshness: OpenAI gpt-image-2.5-sunburst version 2026-09-08 (GA) in swedencentral.
+  cost: 12 images total (4 transition slides x 3 distinct angle/lighting variations) at native 3840x2160; sequential, max 3 attempts for 429/503 backoff.
+images:
+  - name: demo-showroom
+    description: Slide 2 (DEMO) — Luxury bespoke Javorna furniture showroom, 3 distinct architectural angles and lighting moods.
+    prompts:
+      - |
+        Variation 1 — Dramatic multi-level gallery & dramatic spotlighting:
+        Architectural editorial photograph of Javorna's luxury bespoke furniture
+        showroom inside a converted dark-stone Prague hall. Shot from a bold low
+        diagonal perspective looking across staggered matte basalt plinths
+        displaying a cantilevered oiled European walnut dining table, sculptural
+        curved smoked-oak lounge chairs, and towering vertical timber fin walls.
+        Razor-sharp warm museum spotlights cut down through moody charcoal shadow,
+        highlighting natural woodgrain and soft reflections on honed dark terrazzo.
+        The illuminated architectural furniture arrangement occupies the right 58
+        percent of the 16:9 frame; the left 42 percent recedes into calm, deeply
+        shadowed matte slate plaster for clean slide typography.
+      - |
+        Variation 2 — Elevated mezzanine view & warm golden-hour raking light:
+        High-angle architectural photograph looking down diagonally from an upper
+        timber mezzanine into an extraordinary luxury woodworking showroom. A
+        spiral sculptural oak staircase curves on the far right above an artful
+        circular arrangement of bespoke walnut tables, sculptural carved stools,
+        and cantilevered wood-and-leather seating islands. Late-afternoon amber
+        sunbeams rake obliquely across the dark smoked-oak herringbone floor,
+        casting long dramatic architectural shadows. The sunlit showcase fills the
+        right 58 percent of the wide 16:9 frame while the left 42 percent remains
+        deeply shadowed dark architectural concrete and calm negative space.
+      - |
+        Variation 3 — Intimate twilight architectural showcase & dramatic backlighting:
+        Cinematic wide-angle architectural photograph of an ultra-luxurious
+        woodworking gallery showroom at blue hour. Floor-to-ceiling backlit slatted
+        walnut niches on the right glow softly from behind, framing three
+        statement handcrafted sculptural timber pieces on floating dark stone
+        pedestals with dramatic rim lighting and crisp foreground bokeh. Rich
+        contrast between warm honeyed walnut grain and cool twilight reflections
+        on dark glass. Focal pieces occupy the right 56 percent of the 16:9 frame;
+        the left 44 percent is serene, deeply shadowed dark matte wall space.
+
+  - name: motor-pod-kapotou
+    description: Section 1 (Motor pod kapotou) — Handcrafted wooden car model with wooden luxury seats and gleaming chrome engine under open hood, 3 distinct angles.
+    prompts:
+      - |
+        Variation 1 — Dramatic low three-quarter front angle on dark slate studio table:
+        Ultra-photorealistic luxury studio product photograph of an exquisite
+        collector-scale grand-tourer car model sculpted from hand-rubbed European
+        walnut, dark smoked oak, and steam-bent maple bodywork resting on a matte
+        charcoal slate workbench. Through the open cockpit profile, two sculpted
+        luxury wooden bucket seats with fine dovetail and contrasting veneer
+        inlays are clearly visible. The curved wooden hood is propped open on
+        slender metal struts, revealing a breathtaking, jewel-like precision
+        engine crafted entirely from mirror-polished chrome, machined stainless
+        steel, milled aluminum velocity stacks, and gleaming metallic manifolds —
+        unmistakably high-precision polished metal, NOT wood — creating dramatic
+        contrast with the warm timber body. Crisp studio softbox key light and
+        specular rim highlights. Car and open chrome engine sit cleanly in the
+        right 58 percent of the 16:9 frame; the left 42 percent is uncluttered
+        deep charcoal studio shadow.
+      - |
+        Variation 2 — Elevated three-quarter overhead-oblique atelier workbench shot:
+        Editorial studio photograph shot from an intriguing elevated oblique
+        three-quarter angle looking down into the open cockpit and raised front
+        hood of a masterpiece handcrafted wooden sports-coupe model made of dark
+        oiled walnut and laminated birch curves. From this vantage point, both
+        the exquisitely carved ergonomic luxury wooden seats inside the cabin AND
+        the dazzling mirror-chrome mechanical engine under the propped-open wooden
+        hood are simultaneously showcased in razor-sharp detail (polished chrome
+        cylinder covers, braided steel lines, machined brass fittings — pure
+        luxury metal engine contrasting against satin timber). Warm directional
+        atelier overhead spotlight with subtle dark wood shavings out of focus
+        far to the right edge. Positioned on the right 58 percent of the 16:9
+        frame; left 42 percent fades into smooth, dark uncluttered charcoal slate.
+      - |
+        Variation 3 — Dramatic close-up side-front perspective with moody rim lighting:
+        Cinematic macro-editorial product photograph at low eye-level looking
+        along the sweeping sculpted walnut fender of a luxury handcrafted wooden
+        vintage-modern roadster model. The open wooden hood rises dramatically on
+        the right, exposing a stunning, intricately machined gleaming chrome and
+        brushed-titanium multi-cylinder engine glowing with crisp specular light,
+        while just behind the low curved timber windscreen, sculpted dark-walnut
+        luxury bucket seats catch warm amber key light. Rich chiaroscuro lighting
+        in a dark woodworking studio with deep shallow depth of field. The car,
+        chrome engine bay, and wooden cabin fill the right 58 percent of the 16:9
+        frame; the left 42 percent falls cleanly into velvety dark shadow.
+
+  - name: boardroom-spoluprace
+    description: Section 2 (Spolupráce v M365 a provoz aplikací) — Luxury wooden boardroom with people actively collaborating, 3 distinct angles & lighting moods.
+    prompts:
+      - |
+        Variation 1 — Elevated oblique diagonal angle in dramatic golden-hour sunlight:
+        Cinematic architectural editorial photograph of a luxury bespoke Javorna
+        woodworking boardroom featuring a monumental sculpted solid-walnut
+        conference table, curved smoked-oak acoustic wall slats, and handcrafted
+        timber armchairs. Captured from a compelling elevated oblique angle as
+        rich golden-hour directional sunbeams slice through tall dark-framed
+        windows across the tactile woodgrain. Four diverse European professionals
+        in refined smart architectural attire (candid, natural, non-recognizable
+        three-quarter and profile views) sit on the right half of the table
+        actively collaborating — leaning in, gesturing animatedly over timber
+        veneer samples, architectural sketches, and closed/angled notebooks.
+        The vibrant collaboration fills the right 58 percent of the 16:9 frame;
+        the left 42 percent recedes into calm, deeply shadowed dark walnut wall
+        paneling for clean slide typography.
+      - |
+        Variation 2 — Dynamic low table-level perspective & warm evening architectural glow:
+        Atmospheric editorial photograph shot from a dramatic low angle near the
+        dark sculpted walnut table edge looking diagonally down the length of an
+        extraordinary luxury wooden boardroom at dusk. Recessed warm architectural
+        linear LED coves and a sculptural suspended timber-and-brass pendant light
+        illuminate five professionals seated on the right in energetic, genuine
+        team discussion, pointing to material mockups and architectural plans on
+        the table (no legible text or logos). Shallow natural medium-format depth
+        of field softens the dark foreground woodgrain while keeping the animated
+        team sharply focused on the right 58 percent of the frame; the left 42
+        percent opens into quiet, deeply shadowed architectural timber wall.
+      - |
+        Variation 3 — Wide glass-and-timber architectural framing with dramatic side backlight:
+        Sophisticated architectural lifestyle photograph looking obliquely across a
+        sculptural luxury walnut boardroom framed by tall dark timber vertical
+        louvers. Crisp cool-daylight side backlighting from towering courtyard
+        windows mixes with warm interior tungsten spotlights, creating luminous
+        rim light on four professionals gathered around the right side of a live-
+        edge dark walnut table in lively, focused collaboration over sketches and
+        tactile wood blocks (candid, non-recognizable profiles). Rich depth,
+        editorial realism, natural motion energy. The illuminated meeting group
+        sits cleanly in the right 58 percent of the 16:9 frame; the left 42
+        percent is calm, deeply shadowed dark timber-and-plaster negative space.
+
+  - name: chair-gallery
+    description: Section 3 (Multi-model a ekonomika) — Floor-to-ceiling gallery rack with wildly diverse chairs from ultra-basic to luxury and eccentric, 3 distinct compositions.
+    prompts:
+      - |
+        Variation 1 — Dramatic low upward architectural perspective on monumental grid rack:
+        Striking architectural editorial photograph looking slightly upward in
+        diagonal perspective at a monumental floor-to-ceiling dark smoked-oak
+        shelving wall filled with an astonishingly diversified curated collection
+        of distinct chairs and armchairs inside illuminated gallery cubbies.
+        The visual spectrum is unmistakably varied: stark ultra-basic three-legged
+        pine stools and plain utilitarian school chairs, clean mid-tier bentwood
+        and Scandinavian dining chairs, sumptuous bespoke walnut-and-cognac-
+        leather luxury lounge armchairs, and wild eccentric avant-garde sculptural
+        statement chairs with bold asymmetric geometry, sweeping steam-bent ribbon
+        loops, and unexpected organic silhouettes. Warm museum compartment lights
+        sculpt each chair against deep matte dark cubbies. The illuminated chair
+        wall fills the right 60 percent of the 16:9 frame; the left 40 percent
+        transitions cleanly into quiet, deeply shadowed dark architectural wall.
+      - |
+        Variation 2 — Crisp eye-level oblique gallery corridor with dramatic side raking light:
+        Editorial architectural photograph shot along a refined dark-stone museum
+        gallery corridor viewing an immense multi-tier industrial-luxury steel-and-
+        walnut display rack receding in crisp perspective on the right. Three
+        stacked horizontal rows hold over fifteen wildly different chairs: humble
+        rough-hewn wooden stools and minimal folding workshop chairs alongside
+        refined mid-century wooden chairs, plush sculpted walnut-and-velvet
+        executive armchairs, and surreal eccentric avant-garde artistic wood
+        thrones with spiral ribs and cantilevered forms. Dramatic directional
+        track lighting rakes obliquely from above-right, carving crisp shadows and
+        vivid material contrast. The dense diversified chair rack occupies the
+        right 58 percent of the 16:9 frame; the left 42 percent is uncluttered
+        deep dark charcoal gallery wall space.
+      - |
+        Variation 3 — Dramatic wide editorial studio shot with spotlighted architectural grid:
+        High-craft editorial photograph of a dramatic architectural dark-timber
+        display vitrine grid rising three stories high in a moody luxury design
+        archive. Each illuminated square bay showcases one completely distinct
+        chair archetype: ultra-minimalist austere boxy wooden stool, plain painted
+        utilitarian chair, classic curved beech bistro chair, ergonomic sculpted
+        oak task chair, opulent tufted dark-leather and curved walnut club chair,
+        and flamboyant eccentric sculptural art chairs with dramatic geometric
+        cutouts and exaggerated tall backs. Warm theatrical gallery spotlights
+        contrast with deep slate shadows and subtle polished dark concrete floor
+        reflections. The illuminated grid of chairs occupies the right 60 percent
+        of the 16:9 frame; the left 40 percent falls into serene, deeply shadowed
+        matte dark plaster for crisp slide typography.

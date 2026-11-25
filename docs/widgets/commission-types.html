@@ -1,0 +1,175 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>Javorna widget preview</title><style>/* Opt-in logo finalist review and Teams widget mockups. Canonical runtime/UI tokens stay unchanged. */
+.logo-finalists{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}
+.logo-card{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+.logo-card .logo-hero{display:block;width:100%;aspect-ratio:1;height:auto;object-fit:contain;background:#F7F1E7}
+.logo-copy{flex:1;display:flex;flex-direction:column;padding:20px 22px 24px}
+.logo-copy .size-row:first-of-type{margin-top:auto}
+.logo-copy a{align-self:flex-start}
+.logo-copy h2{font-size:26px;margin:4px 0 10px}
+.logo-copy p{font-size:16px;color:var(--text-muted);margin:0 0 10px}
+.logo-path{font:600 12px var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)!important}
+.logo-pm{display:grid;gap:4px;font-size:14px!important}
+.size-row{display:flex;align-items:flex-end;gap:14px;padding:14px;margin-top:12px;border-radius:8px;background:#EEEBDD;color:#332E27;
+  font:12px var(--font-sans)}
+.size-row.dark{background:#332E27;color:#CFCCB6}
+.size-row .size{display:flex;flex-direction:column;align-items:center;gap:4px}
+.size-row img{display:block;object-fit:contain;background:#F7F1E7;border-radius:3px}
+.logo-copy a{display:inline-block;margin-top:14px;font-size:15px}
+
+.widget-rules{margin:12px 0 28px;padding-left:20px}
+.widget-rules li{margin:6px 0}
+.widget-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:32px;align-items:start}
+.widget-shot{margin:0}
+.widget-shot figcaption{margin-top:10px;font:600 13px var(--font-sans);letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.widget-limits{margin-top:26px;font-size:14px;color:var(--text-muted)}
+
+.widget{--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138;--oak:#6B5A45;
+  container-type:inline-size;overflow:hidden;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.18),0 10px 28px rgba(33,31,26,.16);
+  font-family:"Segoe UI",system-ui,sans-serif;line-height:1.35}
+.widget *{box-sizing:border-box;margin:0;padding:0}
+.widget .w-mark{display:block;width:9cqw;height:9cqw;object-fit:contain;background:#F7F1E7;border-radius:1cqw;flex:none}
+.widget .w-word{font:400 3.6cqw Georgia,"Times New Roman",serif;letter-spacing:.16em}
+.widget .w-kicker{margin-left:auto;font-size:2.5cqw;letter-spacing:.14em;text-transform:uppercase;font-weight:650;color:var(--leaf)}
+.widget .w-title{font:400 6.6cqw/1.1 Georgia,"Times New Roman",serif;letter-spacing:-.02em}
+.widget .w-actions{display:flex;flex-wrap:wrap;gap:2cqw}
+.widget .w-btn{padding:1.8cqw 3.4cqw;border-radius:1cqw;background:var(--wood);color:var(--paper);font-size:2.9cqw;font-weight:600}
+.widget .w-btn.ghost{background:transparent;color:var(--wood);box-shadow:inset 0 0 0 .3cqw var(--wood)}
+
+.widget-doc{aspect-ratio:210/297;display:flex;flex-direction:column;background:var(--paper);color:var(--wood)}
+.widget-doc .w-band{display:flex;align-items:center;gap:3cqw;padding:3.4cqw 5.5cqw;background:var(--wood);color:var(--paper)}
+.widget-doc .w-body{flex:1;display:flex;flex-direction:column;gap:3.8cqw;padding:5.5cqw 5.5cqw}
+.widget-doc .w-meta{margin-top:1.6cqw;font-size:2.8cqw;color:var(--oak)}
+.widget-doc .w-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:2.4cqw}
+.widget-doc .w-kpi{padding:2.6cqw;border-top:.9cqw solid var(--pine);background:#F6F3E8}
+.widget-doc .w-kpi b{display:block;font:400 5.6cqw Georgia,"Times New Roman",serif}
+.widget-doc .w-kpi span{font-size:2.6cqw;color:var(--oak)}
+.widget-doc .w-table{width:100%;border-collapse:collapse;font-size:3cqw}
+.widget-doc .w-table th{padding:1.4cqw 0;border-bottom:.25cqw solid var(--wood);text-align:left;font-size:2.3cqw;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--oak)}
+.widget-doc .w-table td{padding:1.9cqw 0;border-bottom:.2cqw solid var(--muted)}
+.widget-doc .w-table td:last-child{font-weight:650;color:var(--pine)}
+.widget-doc .w-text{font-size:3.1cqw}
+.widget-doc .w-note{margin-top:auto;padding:3cqw 4cqw;background:var(--pine);color:var(--paper);font-size:3cqw}
+
+.widget-square{aspect-ratio:1;display:flex;flex-direction:column;padding:7%;background:var(--wood);color:var(--paper)}
+.widget .sq-top{display:flex;align-items:center;gap:3cqw}
+.widget-square .w-mark{width:10cqw;height:10cqw}
+.widget-square .w-word{font-size:4.4cqw}
+.widget-square .w-kicker{font-size:3.2cqw}
+.widget-square .sq-big{margin-top:7cqw;font:400 30cqw/.9 Georgia,"Times New Roman",serif;letter-spacing:-.04em;color:var(--leaf)}
+.widget-square .sq-big small{font-size:12cqw;letter-spacing:0;color:var(--muted)}
+.widget-square .sq-label{margin-top:2cqw;font-size:4.4cqw;color:var(--paper)}
+.widget-square .sq-countries{display:grid;grid-template-columns:repeat(4,1fr);gap:2.6cqw;margin-top:auto}
+.widget-square .sq-country{display:flex;flex-direction:column;padding-top:2.4cqw;border-top:1.4cqw solid var(--leaf);font-size:3.2cqw}
+.widget-square .sq-country b{font:400 6cqw Georgia,"Times New Roman",serif}
+.widget-square .sq-country em{font-style:normal;color:var(--leaf)}
+.widget-square .sq-country.open{border-top-color:var(--muted)}
+.widget-square .sq-country.open em{color:var(--paper);font-weight:650}
+.widget-square .sq-next{margin-top:5cqw;padding-top:3cqw;border-top:.25cqw solid rgba(207,204,182,.35);font-size:3.4cqw;color:var(--muted)}
+.widget-square .sq-next b{margin-right:2cqw;color:var(--paper)}
+
+.widget-announce{background:var(--paper);color:var(--wood)}
+.widget-announce .w-photo{position:relative;height:56cqw;overflow:hidden;background:var(--deep)}
+.widget-announce .photo{display:block;width:100%;height:100%;object-fit:cover;object-position:62% 60%}
+.widget-announce .w-photo-copy{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;
+  padding:5.5cqw;color:var(--paper);background:linear-gradient(180deg,rgba(33,31,26,.72),rgba(33,31,26,.08) 42%,rgba(33,31,26,.86))}
+.widget-announce .w-photo-copy .w-title{max-width:78%;color:var(--paper)}
+.widget-announce .w-body{display:flex;flex-direction:column;gap:5cqw;padding:6cqw 5.5cqw}
+.widget-announce .w-owners{list-style:none;display:grid;gap:2.4cqw}
+.widget-announce .w-owners li{display:flex;justify-content:space-between;gap:3cqw;padding-bottom:2.2cqw;border-bottom:.2cqw solid var(--muted);
+  font-size:3.4cqw}
+.widget-announce .w-owners span{color:var(--oak)}
+.widget-announce .w-timeline{display:grid;grid-template-columns:repeat(3,1fr);gap:2cqw}
+.widget-announce .w-timeline span{padding-top:2cqw;border-top:.9cqw solid var(--pine);font-size:2.9cqw;color:var(--oak)}
+.widget-announce .w-timeline b{display:block;font:400 4.6cqw Georgia,"Times New Roman",serif;color:var(--wood)}
+
+.iteration-log summary{cursor:pointer;font-weight:600}
+.iteration-log h3{margin:24px 0 12px;font-size:18px}
+.iteration-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.iteration{margin:0;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.iteration.chosen{box-shadow:inset 0 0 0 3px #4C6138}
+.iteration img{display:block;width:100%;height:auto;aspect-ratio:1;border-radius:4px}
+.iteration figcaption{margin-top:6px;font-size:13px;color:var(--text-muted)}
+.iteration code{display:block;font-size:11px;margin-bottom:2px}
+@media print{
+  .widget,.logo-card{break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .iteration-log:not([open]){display:none}
+  .logo-copy a{display:none}
+}
+/* Explicit Javorna brand profile. Shared document UI tokens remain untouched. */
+.javorna{--wood:#332E27;--deep:#211F1A;--paper:#EEEBDD;--muted:#CFCCB6;--leaf:#BCCB7A;--pine:#4C6138;--oak:#6B5A45}
+.javorna .j-mark,.study-frame.javorna .sample-mark,.javorna.widget .w-mark{
+  display:block;object-fit:contain;background:transparent;border:0;border-radius:0;box-shadow:none;
+  aspect-ratio:357/367.25;flex:none}
+.study-frame.javorna .sample-lockup{gap:1.7cqw}
+.study-frame.javorna .sample-mark{width:7cqw;height:auto}
+.study-frame.javorna .content-top .sample-mark{width:4.5cqw;height:auto}
+.study-frame.javorna .sample-wordmark{letter-spacing:.18em}
+.javorna.widget .w-mark{width:8cqw;height:auto}
+.javorna .j-lockup{display:flex;align-items:center;gap:18px;font:24px Georgia,"Times New Roman",serif;letter-spacing:.18em}
+.javorna .j-lockup small{display:block;font:10px "Segoe UI",sans-serif;letter-spacing:.2em;margin-top:5px}
+.javorna .j-lockup .j-mark{width:52px;height:auto}
+.javorna .slide:not(.furniture-slide){background:var(--paper);color:var(--wood);padding:44px 62px 48px}
+.javorna .slide>.j-lockup{margin-bottom:24px;flex-shrink:0}
+.javorna .slide .slide-title{font:44px/1.15 Georgia,"Times New Roman",serif;color:var(--wood);letter-spacing:-.025em}
+.javorna .slide .slide-head{margin-bottom:28px;border-color:var(--muted)}
+.javorna .slide .slide-body{color:var(--wood)}
+.javorna .slide .slide-lead{color:var(--oak)}
+.javorna .slide .slide-note{color:var(--oak)}
+.javorna .slide table th{color:var(--pine);background:transparent;border-color:var(--oak)}
+.javorna .slide table td{border-color:var(--muted)}
+.javorna .slide table tr{background:transparent}
+.javorna .slide .callout{background:transparent;border-color:var(--pine);color:var(--wood)}
+.javorna .slide .callout-label{color:var(--pine)}
+.javorna .slide .arrow-list>li::before{color:var(--pine)}
+.javorna .slide:is(.slide--section,.slide--end){background:var(--wood);color:var(--paper)}
+.javorna .slide:is(.slide--section,.slide--end) .j-lockup{position:absolute;top:44px;left:62px;color:var(--paper)}
+.javorna .slide:is(.slide--section,.slide--end) h2{color:var(--paper);font-family:Georgia,"Times New Roman",serif}
+.javorna .slide:is(.slide--section,.slide--end) .slide-note{color:var(--muted)}
+.javorna .slide:is(.slide--section,.slide--end) .slide-lead{color:var(--muted)}
+.javorna .slide--end>p{font-family:Georgia,"Times New Roman",serif;color:var(--paper)}
+.javorna .slide--end::before{background:var(--leaf)}
+.javorna.doc .doc-header{background:var(--paper);color:var(--wood);padding:36px;border-top:5px solid var(--pine)}
+.javorna.doc .doc-header .j-lockup{margin-bottom:32px}
+.javorna.doc .doc-header h1{color:var(--wood);font-family:Georgia,"Times New Roman",serif}
+.javorna.doc .doc-header .subtitle,.javorna.doc .doc-header p{color:var(--oak)}
+.javorna.widget-announce .w-photo-copy{background:var(--wood)}
+.javorna.widget-announce .w-photo-copy .w-title{position:relative;max-width:85%}
+.javorna .j-growth{position:absolute;width:35%;height:auto;right:3%;top:4%;opacity:.25}
+@media(max-width:560px){.javorna.doc .doc-header{padding:24px}.javorna .j-lockup{font-size:20px}}
+@media print{.javorna,.javorna .slide{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+.vector-pair{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.vector-tile{padding:34px;background:#EEEBDD;color:#332E27}
+.vector-tile.dark{background:#332E27;color:#EEEBDD}
+.vector-lockup{display:flex;gap:26px;align-items:center;margin-bottom:40px}
+.vector-lockup>img{width:110px;height:auto}
+.vector-lockup>span{font:28px Georgia,"Times New Roman",serif;letter-spacing:.17em}
+.vector-lockup small{display:block;font:10px "Segoe UI",sans-serif;letter-spacing:.2em;margin-top:8px}
+.vector-tile h2{font-size:22px}
+.vector-tile p{font-size:16px;line-height:1.5}
+.vector-sizes{display:flex;align-items:end;gap:28px;margin-top:32px}
+.vector-sizes span{display:flex;flex-direction:column;gap:12px;font:12px "Segoe UI",sans-serif}
+.vector-sizes img{display:block}
+.vector-facts{font-size:15px;color:var(--text-muted);margin-top:20px}
+.vector-original{margin-top:30px}
+.vector-original summary{cursor:pointer;font-weight:600}
+.vector-compare{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.vector-compare figure{position:relative;margin:20px 0;background:#FAF5EF}
+.vector-compare img{display:block;width:100%;height:auto}
+.vector-compare .vector-aligned{width:69.7265625%;margin:15.185546875% 14.208984375% 13.0859375% 16.064453125%}
+.vector-compare figcaption{padding:15px;font-size:14px;color:#332E27}
+.commission-widget{max-width:760px;padding:32px;background:#EEEBDD;color:#332E27;border-top:4px solid #4C6138}
+.commission-kicker{margin:0 0 10px;color:#4C6138;font:600 12px "Segoe UI",sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.commission-widget h3{margin:0;font:400 28px/1.2 Georgia,"Times New Roman",serif}
+.commission-intro{margin:8px 0 24px;color:#6B5A45;font:15px/1.5 "Segoe UI",sans-serif}
+.commission-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.commission-option{display:flex;min-height:180px;flex-direction:column;align-items:flex-start;gap:12px;padding:18px;border:1px solid #B9B5A5;background:#F7F5EE}
+.commission-option img{width:48px;height:48px}
+.commission-option strong{font:600 15px/1.3 "Segoe UI",sans-serif}
+.commission-option span{font:13px/1.5 "Segoe UI",sans-serif;color:#6B5A45}
+.commission-caption{margin:16px 0 0;font:12px "Segoe UI",sans-serif;color:#6B5A45}
+@media(max-width:800px){.vector-pair{grid-template-columns:1fr}.vector-lockup>span{font-size:24px}}
+@media(max-width:560px){.vector-tile{padding:24px}.vector-lockup{gap:20px}.vector-lockup>img{width:86px}.vector-compare{grid-template-columns:1fr}
+  .commission-widget{padding:22px}.commission-widget h3{font-size:23px}.commission-options{grid-template-columns:1fr}.commission-option{min-height:0}}
+@media print{.vector-tile{break-inside:avoid;print-color-adjust:exact}.vector-original:not([open]){display:none}}
+body{max-width:704px;box-sizing:border-box;margin:0 auto;padding:12px;background:#EEEBDD}.widget{max-width:680px;margin:auto}.commission-widget{max-width:680px;margin:auto}</style></head><body><section class="commission-widget" aria-labelledby="commission-heading"><p class="commission-kicker">Nová zakázka · 01</p><h3 id="commission-heading">Pro jaký prostor tvoříme?</h3><p class="commission-intro">Vyberte typ zakázky. Podrobnosti doplníme v dalším kroku.</p><div class="commission-options" role="group" aria-label="Typ zakázky"><div class="commission-option"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiM0QzYxMzgiIHN0cm9rZS13aWR0aD0iMi44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSBkZXNjIj48dGl0bGUgaWQ9InRpdGxlIj5CeWRsZW7DrSBhIGRvbcOhY25vc3RpPC90aXRsZT48ZGVzYyBpZD0iZGVzYyI+SmVkbm9kdWNow70gb2JyeXMgZG9tdSBzIG9rbmVtIGEgZHZlxZltaS48L2Rlc2M+PHBhdGggZD0iTTcgMjkgMzIgOGwyNSAyMU0xMyAyNXYzMWgzOFYyNU0yNiA1NlYzOWgxMnYxN00yMCAzMWg3djdoLTd6Ii8+PC9zdmc+DQo=" width="64" height="64" alt=""><strong>Bydlení a domácnosti</strong><span>Nábytek a interiéry na míru.</span></div><div class="commission-option"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiM0QzYxMzgiIHN0cm9rZS13aWR0aD0iMi44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSBkZXNjIj48dGl0bGUgaWQ9InRpdGxlIj5GaXJteSBhIHZlxZllam7DqSBwcm9zdG9yeTwvdGl0bGU+PGRlc2MgaWQ9ImRlc2MiPlByYWNvdm7DrSBzdMWvbCBzIGxhbXBvdSBhIG90ZXbFmWVub3Uga25paG91LjwvZGVzYz48cGF0aCBkPSJNOCAzNmg0OE0xMyAzNnYyMG0zOC0yMHYyME0yMiAzMGgzMXY2TTI1IDMwVjEzaDEzdjE3TTIwIDEzaDIzTTI3IDQ4aDExTTMyIDQzdjVNMTAgNTZoNDRNNDUgMThsNyA4TTUyIDI2bC01IDIiLz48L3N2Zz4NCg==" width="64" height="64" alt=""><strong>Firmy a veřejné prostory</strong><span>Kanceláře, hotely a reprezentativní interiéry.</span></div><div class="commission-option"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIiBzdHJva2U9IiM0QzYxMzgiIHN0cm9rZS13aWR0aD0iMi44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHJvbGU9ImltZyIgYXJpYS1sYWJlbGxlZGJ5PSJ0aXRsZSBkZXNjIj48dGl0bGUgaWQ9InRpdGxlIj5VbcSbbGVja8OpIGEgc3BlY2nDoWxuw60gemFrw6F6a3k8L3RpdGxlPjxkZXNjIGlkPSJkZXNjIj7FmGV6YsOhxZlza8OpIGRsw6F0bywgaG9ibGlueSBhIG96ZG9ibsOpIGTFmWV2b8WZZXpieS48L2Rlc2M+PHBhdGggZD0ibTE4IDUxIDI0LTM0bS0xNyAzNyAyNS0zNW0tMzAgMzAgOCA2bTE0LTQzIDUgNC01IDctNS00ek04IDUyYzQtNSA5LTUgMTMgMG0tOSA1YzQtMyA4LTMgMTIgME00MSA1MWM0LTUgOS01IDEzIDBtLTkgNWM0LTMgOC0zIDEyIDAiLz48L3N2Zz4NCg==" width="64" height="64" alt=""><strong>Umělecké a speciální zakázky</strong><span>Kostely, restaurace, film a restaurování.</span></div></div><p class="commission-caption">Formulářová navigace, ne další logo</p></section></body></html>

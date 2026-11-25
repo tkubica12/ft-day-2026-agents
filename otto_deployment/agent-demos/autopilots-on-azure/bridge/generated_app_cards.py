@@ -236,7 +236,11 @@ def _action(
 
 def _hours(seconds: int) -> str:
     hours = seconds // 3600
-    return f"{hours} hour" if hours == 1 else f"{hours} hours"
+    if hours == 1:
+        return "1 hodina"
+    if 2 <= hours <= 4:
+        return f"{hours} hodiny"
+    return f"{hours} hodin"
 
 
 def generated_apps_card(
@@ -244,7 +248,7 @@ def generated_apps_card(
     *,
     user_id: str,
     conversation_id: str,
-    title: str = "Your generated sites",
+    title: str = "Vaše vygenerované aplikace",
 ) -> dict[str, Any]:
     body: list[dict[str, Any]] = [
         {
@@ -257,8 +261,8 @@ def generated_apps_card(
         {
             "type": "TextBlock",
             "text": (
-                "Sites auto-suspend after 5 minutes idle and wake "
-                "OnDemand. Retention starts after suspension."
+                "Aplikace se po 5 minutách nečinnosti automaticky uspí a na požádání "
+                "znovu probudí. Doba uchování běží od uspání."
             ),
             "wrap": True,
             "isSubtle": True,
@@ -266,8 +270,8 @@ def generated_apps_card(
         {
             "type": "TextBlock",
             "text": (
-                "This card is a snapshot. After an action, ask Hermes "
-                "for your running sites to refresh it."
+                "Tato karta je aktuální snímek. Po provedení akce požádejte Otta "
+                "o seznam běžících aplikací pro obnovení."
             ),
             "wrap": True,
             "isSubtle": True,
@@ -277,7 +281,7 @@ def generated_apps_card(
         body.append(
             {
                 "type": "TextBlock",
-                "text": "You have no generated sites.",
+                "text": "Nemáte žádné vygenerované aplikace.",
                 "wrap": True,
             }
         )
@@ -292,7 +296,7 @@ def generated_apps_card(
         }
     app = apps[0]
     app_id = str(app["appId"])
-    state = str(app.get("state") or "Unknown")
+    state = str(app.get("state") or "Neznámý")
     retention = int(app.get("retentionSeconds") or 0)
     body.extend(
         [
@@ -306,12 +310,12 @@ def generated_apps_card(
             {
                 "type": "FactSet",
                 "facts": [
-                    {"title": "State", "value": state},
+                    {"title": "Stav", "value": state},
                     {
-                        "title": "Retention",
+                        "title": "Uchování",
                         "value": (
                             _hours(retention)
-                            + " after suspension"
+                            + " po uspání"
                         ),
                     },
                 ],
@@ -322,7 +326,7 @@ def generated_apps_card(
         body.append(
             {
                 "type": "TextBlock",
-                "text": f"[Open site]({app['url']})",
+                "text": f"[Otevřít aplikaci]({app['url']})",
                 "wrap": True,
             }
         )
@@ -336,15 +340,15 @@ def generated_apps_card(
             retention_seconds=seconds,
         )
         for label, seconds in (
-            ("Keep 1h", 3600),
-            ("Keep 6h", 21600),
-            ("Keep 24h", 86400),
-            ("Keep 72h", 259200),
+            ("Ponechat 1 h", 3600),
+            ("Ponechat 6 h", 21600),
+            ("Ponechat 24 h", 86400),
+            ("Ponechat 72 h", 259200),
         )
     ]
     actions.append(
         _action(
-            title="Delete now",
+            title="Smazat nyní",
             app_id=app_id,
             action="delete",
             user_id=user_id,
@@ -368,7 +372,7 @@ def generated_apps_activity(
     *,
     user_id: str,
     conversation_id: str,
-    title: str = "Your generated sites",
+    title: str = "Vaše vygenerované aplikace",
 ) -> Activity:
     cards = (
         [
@@ -414,7 +418,7 @@ def generated_app_action_completed_card(
         "body": [
             {
                 "type": "TextBlock",
-                "text": "Site action completed",
+                "text": "Akce s aplikací dokončena",
                 "weight": "Bolder",
                 "size": "Medium",
                 "wrap": True,
@@ -428,8 +432,8 @@ def generated_app_action_completed_card(
             {
                 "type": "TextBlock",
                 "text": (
-                    "Ask Hermes for your running sites to get "
-                    "fresh controls."
+                    "Požádejte Otta o seznam běžících aplikací pro nové "
+                    "ovládací prvky."
                 ),
                 "isSubtle": True,
                 "wrap": True,

@@ -35,9 +35,9 @@ class VisualArtifactTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;steal()&lt;/script&gt;", content)
         self.assertNotIn('<img src="https://attacker.example">', content)
         self.assertIn("default-src 'none'", content)
-        self.assertIn("Slides", content)
-        self.assertIn('<html lang="en">', content)
-        self.assertIn("Fictional Javorna Group demo data", content)
+        self.assertIn("Slidy", content)
+        self.assertIn('<html lang="cs">', content)
+        self.assertIn("Fiktivní demo data Javorna Group", content)
 
     def test_rejects_malformed_and_oversized_input(self):
         for value in ({"title": "a", "sections": []}, {"title": "a", "sections": SPEC["sections"] * 5}):

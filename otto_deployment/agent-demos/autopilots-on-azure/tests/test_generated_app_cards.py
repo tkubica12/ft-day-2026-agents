@@ -32,7 +32,7 @@ class GeneratedAppCardTests(unittest.TestCase):
                 user_id="user-1",
                 conversation_id="conversation-1",
             )
-            rendered = json.dumps(card)
+            rendered = json.dumps(card, ensure_ascii=False)
             delete_action = card["actions"][-1]
             token = decode_generated_app_action_token(
                 delete_action["data"][GENERATED_APP_ACTION_TOKEN],
@@ -40,8 +40,8 @@ class GeneratedAppCardTests(unittest.TestCase):
                 conversation_id="conversation-1",
             )
 
-        self.assertIn("[Open site]", rendered)
-        self.assertIn("Keep 72h", rendered)
+        self.assertIn("[Otevřít aplikaci]", rendered)
+        self.assertIn("Ponechat 72 h", rendered)
         self.assertEqual(token["action"], "delete")
         self.assertEqual(token["appId"], "a" * 24)
 

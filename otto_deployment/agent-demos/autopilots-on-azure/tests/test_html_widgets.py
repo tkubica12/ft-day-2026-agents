@@ -60,8 +60,8 @@ class HtmlWidgetTests(WidgetEnvironment, unittest.TestCase):
         self.assertIn("ui/notifications/size-changed", payload["html"])
         self.assertIn("connect-src &#x27;none&#x27;", payload["html"])
         self.assertEqual(payload["securityPolicy"]["connectDomains"], [])
-        self.assertIn('<html lang="en">', payload["html"])
-        self.assertIn("Fictional Javorna Group demo data", payload["html"])
+        self.assertIn('<html lang="cs">', payload["html"])
+        self.assertIn("Fiktivní demo data Javorna Group", payload["html"])
         self.assertIn('src="data:image/svg+xml;base64,', payload["html"])
         self.assertNotIn("test-key", activity.text)
         self.assertLess(payload["html"].index("window.addEventListener('message'"),

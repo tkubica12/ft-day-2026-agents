@@ -27,16 +27,16 @@ DIFF_LINE_BUDGETS = (12, 6, 0)
 MAX_DIFF_LINE_CHARACTERS = 160
 MAX_CARD_BYTES = 27_000
 ORIGIN_LABELS = {
-    "foreground": "during a conversation",
-    "background": "background review or Curator",
-    "owner": "your decision",
-    "background_review": "background review",
+    "foreground": "během konverzace",
+    "background": "kontrola na pozadí nebo Curator",
+    "owner": "vaše rozhodnutí",
+    "background_review": "kontrola na pozadí",
 }
 NAMESPACE_LABELS = {
-    "private": "Private Playbook",
-    "role": "Role Skill",
-    "candidates": "Candidate Improvement",
-    "local": "Local skill",
+    "private": "Soukromý playbook",
+    "role": "Dovednost role",
+    "candidates": "Návrh zlepšení",
+    "local": "Lokální dovednost",
 }
 
 
@@ -167,7 +167,7 @@ def _text(text: str, **properties: Any) -> dict[str, Any]:
 def _diff_blocks(diff: str, truncated: bool, max_lines: int) -> list[dict[str, Any]]:
     lines = diff.splitlines()
     if lines and not max_lines:
-        return [_text("Diff omitted to fit the Teams card. Send /learning for fewer items.", isSubtle=True, size="Small")]
+        return [_text("Rozdíl byl vynechán, aby se vešel do karty v Teams. Pro méně položek pošlete /learning.", isSubtle=True, size="Small")]
     blocks = []
     for line in lines[:max_lines]:
         color = "Good" if line.startswith("+") and not line.startswith("+++") else (
@@ -182,17 +182,17 @@ def _diff_blocks(diff: str, truncated: bool, max_lines: int) -> list[dict[str, A
             }],
         })
     if truncated or len(lines) > max_lines:
-        blocks.append(_text("Diff shortened.", isSubtle=True, size="Small", spacing="None"))
+        blocks.append(_text("Rozdíl zkrácen.", isSubtle=True, size="Small", spacing="None"))
     return blocks
 
 
 def _skill_label(item: dict[str, Any]) -> str:
-    namespace = NAMESPACE_LABELS.get(str(item.get("namespace") or ""), "Skill")
+    namespace = NAMESPACE_LABELS.get(str(item.get("namespace") or ""), "Dovednost")
     return f"**{item.get('skill') or item.get('artifactPath') or 'skill'}** · {namespace}"
 
 
 def _change_container(item: dict[str, Any], *, user_id: str, conversation_id: str, diff_lines: int) -> dict[str, Any]:
-    origin = ORIGIN_LABELS.get(str(item.get("origin") or ""), str(item.get("origin") or "unknown"))
+    origin = ORIGIN_LABELS.get(str(item.get("origin") or ""), str(item.get("origin") or "neznámý původ"))
     items: list[dict[str, Any]] = [
         _text(_skill_label(item)),
         _text(f"{item.get('action')} · {origin} · {item.get('ts')}", isSubtle=True, size="Small", spacing="None"),
@@ -200,23 +200,23 @@ def _change_container(item: dict[str, Any], *, user_id: str, conversation_id: st
     ]
     if item.get("undoable"):
         items.append({"type": "ActionSet", "actions": [_action(
-            "Undo", "undo", str(item["entryId"]), user_id=user_id, conversation_id=conversation_id,
+            "Vrátit zpět", "undo", str(item["entryId"]), user_id=user_id, conversation_id=conversation_id,
         )]})
     else:
-        items.append(_text(f"Undo unavailable: {item.get('undoBlockedReason')}", isSubtle=True, size="Small"))
+        items.append(_text(f"Vrácení není dostupné: {item.get('undoBlockedReason')}", isSubtle=True, size="Small"))
     return {"type": "Container", "separator": True, "items": items}
 
 
 def _pending_container(item: dict[str, Any], *, user_id: str, conversation_id: str, diff_lines: int) -> dict[str, Any]:
-    origin = ORIGIN_LABELS.get(str(item.get("origin") or ""), str(item.get("origin") or "unknown"))
+    origin = ORIGIN_LABELS.get(str(item.get("origin") or ""), str(item.get("origin") or "neznámý původ"))
     return {"type": "Container", "separator": True, "items": [
         _text(_skill_label(item)),
         _text(f"{item.get('summary')} · {origin}", isSubtle=True, size="Small", spacing="None"),
         *_diff_blocks(str(item.get("diff") or ""), bool(item.get("diffTruncated")), diff_lines),
         {"type": "ActionSet", "actions": [
-            _action("Approve", "approve", str(item["pendingId"]), user_id=user_id, conversation_id=conversation_id,
+            _action("Schválit", "approve", str(item["pendingId"]), user_id=user_id, conversation_id=conversation_id,
                     style="positive"),
-            _action("Reject", "reject", str(item["pendingId"]), user_id=user_id, conversation_id=conversation_id,
+            _action("Zamítnout", "reject", str(item["pendingId"]), user_id=user_id, conversation_id=conversation_id,
                     style="destructive"),
         ]},
     ]}
@@ -225,26 +225,26 @@ def _pending_container(item: dict[str, Any], *, user_id: str, conversation_id: s
 def _governed_container(item: dict[str, Any], *, user_id: str, conversation_id: str, diff_lines: int) -> dict[str, Any]:
     choice = item.get("choice") or {}
     if choice.get("choice") == "share" and choice.get("current"):
-        state = "Marked for sharing in the next Learning Packet."
+        state = "Označeno ke sdílení v dalším balíčku učení."
     elif choice.get("choice") == "share":
-        state = "Changed after you chose Share; choose again."
+        state = "Změněno po volbě Sdílet; vyberte prosím znovu."
     else:
-        state = "Not shared. Nothing leaves this Worker without your choice."
+        state = "Nesdíleno. Nic neopustí tohoto Workera bez vaší volby."
     items: list[dict[str, Any]] = [
         _text(_skill_label(item)),
         _text(state, isSubtle=True, size="Small", spacing="None"),
     ]
     if not item.get("traceComplete"):
-        items.append(_text(f"Native trace incomplete: {item.get('traceReason')}", color="Warning", size="Small"))
+        items.append(_text(f"Nativní stopa není úplná: {item.get('traceReason')}", color="Warning", size="Small"))
     target = str(item["artifactPath"])
     artifact_hash = str(item.get("artifactHash") or "")
     actions = [
         _action(label, choice_name, target, user_id=user_id, conversation_id=conversation_id,
                 artifact_hash=artifact_hash, style=style)
         for label, choice_name, style in (
-            ("Share", "share", "positive"),
-            ("Keep only for me", "keep", None),
-            ("Discard", "discard", "destructive"),
+            ("Sdílet", "share", "positive"),
+            ("Ponechat jen pro mě", "keep", None),
+            ("Zahodit", "discard", "destructive"),
         )
         if item.get("traceComplete") or choice_name != "share"
     ]
@@ -279,17 +279,17 @@ def _digest_card(
     changes, more_changes = selected("changes", MAX_CHANGES)
     pending, more_pending = selected("pending", MAX_PENDING)
     governed, more_governed = selected("governed", MAX_GOVERNED)
-    mode = "Strict approval is on: skill changes wait for you." if digest.get("strictMode") else (
-        "Changes apply immediately; you can undo each one."
+    mode = "Přísné schvalování je zapnuté: změny dovedností čekají na vaše schválení." if digest.get("strictMode") else (
+        "Změny se projeví okamžitě; každou z nich můžete vrátit zpět."
     )
     body: list[dict[str, Any]] = [
-        _text("What I learned", weight="Bolder", size="Medium"),
+        _text("Co jsem se naučil", weight="Bolder", size="Medium"),
         _text(mode, isSubtle=True),
     ]
     sections = (
-        ("Skill changes", changes, more_changes, _change_container),
-        ("Waiting for your approval", pending, more_pending, _pending_container),
-        ("Share with the role?", governed, more_governed, _governed_container),
+        ("Změny dovedností", changes, more_changes, _change_container),
+        ("Čeká na vaše schválení", pending, more_pending, _pending_container),
+        ("Sdílet s rolí?", governed, more_governed, _governed_container),
     )
     for title, items, more, render in sections:
         if not items:
@@ -299,11 +299,11 @@ def _digest_card(
             render(item, user_id=user_id, conversation_id=conversation_id, diff_lines=diff_lines) for item in items
         )
         if more:
-            body.append(_text(f"{more} more. Send /learning after deciding these.", isSubtle=True, size="Small"))
+            body.append(_text(f"Dalších {more}. Po vyřízení těchto položek pošlete /learning.", isSubtle=True, size="Small"))
     if not (changes or pending or governed):
-        body.append(_text("Nothing new since the last digest."))
+        body.append(_text("Od posledního přehledu nic nového."))
     body.append(_text(
-        "Memory updates stay autonomous. Private Playbooks never leave this Worker.", isSubtle=True, size="Small",
+        "Úpravy paměti zůstávají autonomní. Soukromé playbooky nikdy neopouštějí tohoto Workera.", isSubtle=True, size="Small",
     ))
     return {
         "type": "AdaptiveCard",
@@ -318,7 +318,7 @@ def learning_digest_activity(
 ) -> Activity:
     return Activity(
         type="message",
-        text=text or "What I learned",
+        text=text or "Co jsem se naučil",
         attachments=[Attachment(
             content_type=CARD_CONTENT_TYPE,
             content=learning_digest_card(
@@ -334,9 +334,9 @@ def learning_action_accepted_card(message: str) -> dict[str, Any]:
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "version": "1.4",
         "body": [
-            _text("Learning decision received", weight="Bolder", size="Medium"),
+            _text("Rozhodnutí o učení přijato", weight="Bolder", size="Medium"),
             _text(message, color="Good"),
-            _text("A refreshed digest follows in this chat.", isSubtle=True),
+            _text("Aktualizovaný přehled bude následovat v tomto chatu.", isSubtle=True),
         ],
     }
 
@@ -345,27 +345,27 @@ def learning_action_label(token: dict[str, Any]) -> str:
     target = str(token.get("target") or "")
     skill = target.rsplit("/", 1)[-1]
     return {
-        "undo": f"Undo change {target}",
-        "approve": f"Approve staged change {target}",
-        "reject": f"Reject staged change {target}",
-        "share": f"Share {skill} with the role",
-        "keep": f"Keep {skill} only for you",
-        "discard": f"Discard the change to {skill}",
+        "undo": f"Vrátit změnu {target}",
+        "approve": f"Schválit navrženou změnu {target}",
+        "reject": f"Zamítnout navrženou změnu {target}",
+        "share": f"Sdílet {skill} s rolí",
+        "keep": f"Ponechat {skill} jen pro vás",
+        "discard": f"Zahodit změnu u {skill}",
     }[str(token["action"])]
 
 
 def learning_result_message(token: dict[str, Any], receipt: dict[str, Any]) -> str:
-    skill = str(receipt.get("artifactPath") or receipt.get("skill") or token.get("target") or "the skill")
+    skill = str(receipt.get("artifactPath") or receipt.get("skill") or token.get("target") or "dovednosti")
     action = str(token["action"])
     message = {
-        "undo": f"Undone: {receipt.get('action')} of {skill}.",
-        "approve": f"Approved and applied the staged change to {skill}.",
-        "reject": f"Rejected the staged change to {skill}.",
-        "share": f"{skill} is marked for the next Learning Packet. Nothing is sent until an operator approves it.",
+        "undo": f"Vráceno zpět: {receipt.get('action')} u {skill}.",
+        "approve": f"Schváleno a použito u {skill}.",
+        "reject": f"Navržená změna u {skill} byla zamítnuta.",
+        "share": f"{skill} je označeno pro další balíček učení. Nic se neodešle bez schválení operátora.",
         "keep": (
-            f"Kept your version as Private Playbook {receipt.get('privatePlaybook')}; "
-            f"{skill} is back to the Role Release baseline."
+            f"Vaše verze byla uložena jako Soukromý playbook {receipt.get('privatePlaybook')}; "
+            f"{skill} je zpět na výchozí verzi role."
         ),
-        "discard": f"Discarded the change; {skill} is back to the Role Release baseline.",
+        "discard": f"Změna byla zahozena; {skill} je zpět na výchozí verzi role.",
     }[action]
-    return f"Already done earlier. {message}" if receipt.get("duplicate") else message
+    return f"Již dříve vyřízeno. {message}" if receipt.get("duplicate") else message

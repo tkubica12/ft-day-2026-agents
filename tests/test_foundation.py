@@ -215,7 +215,7 @@ class FoundationTests(unittest.TestCase):
             self.assertTrue(all(m["src"].startswith("assets/javorna/") for m in parsed.media))
             self.assertNotIn("<video", text)
             self.assertNotIn("brand-candidates/", text)
-            self.assertIn("Not recorded yet" if text == deck else "pending", text)
+            self.assertIn("Zatím nenahráno" if text == deck else "čeká na nahrání", text)
 
     def test_player_keeps_penta_runtime_with_branded_pending_slots(self):
         player = load("player", "scripts/build_player.py")
@@ -227,10 +227,10 @@ class FoundationTests(unittest.TestCase):
         self.assertEqual(page.count('class="pending"'), len(data["scenes"]))
         self.assertEqual(page.count("    v.src = src;"), 1)
         self.assertEqual(page.count("<script>"), 1)
-        self.assertEqual(page.count('<section class="slide'), 32)
+        self.assertEqual(page.count('<section class="slide'), 34)
         for scene in data["scenes"]:
             if scene["prompt"]:
-                self.assertIn(builder.esc(scene["prompt"]), page)
+                self.assertIn(builder.esc(scene["prompt"]).replace("\n", "<br>"), page)
         for presenter in data["presenters"]:
             self.assertIn(f'<b>{builder.esc(presenter["name"])}</b>', page)
         parsed = Document(page)

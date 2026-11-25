@@ -25,7 +25,7 @@ class WidgetSmokeTests(unittest.TestCase):
         self.assertNotIn("<button", markup)
         self.assertNotIn("fetch(", markup)
         self.assertNotIn("<script src=", markup)
-        self.assertIn("Fictional Javorna Group demo data", markup)
+        self.assertIn("Fiktivní demo data Javorna Group", markup)
 
     def test_counter_is_local_and_waits_for_host_initialization(self):
         encoded = widget_activity("abc123", interactive=True)["text"]

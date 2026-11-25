@@ -45,7 +45,7 @@ class HtmlDocsArtifactTests(unittest.TestCase):
                 self.assertIn("Permission is hereby granted", content)
                 self.assertIn('<html lang="en"', content)
                 self.assertIn('aria-label="Document controls"', content)
-                self.assertIn("Fictional Javorna Group demo data", content)
+                self.assertIn("Fiktivní demo data Javorna Group", content)
                 self.assertIn('data-default-accent="green"', content)
                 self.assertIn('data-action="toggle-slides"' if kind != "brief" else "sheet-page", content)
                 if kind != "brief":

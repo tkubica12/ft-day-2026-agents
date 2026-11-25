@@ -5,7 +5,7 @@ description: Prepare an offline html-docs report, presentation, or brief from fi
 
 # Visual artifacts
 
-Write all artifact content in English, including titles, source descriptions,
+Write all artifact content in Czech, including titles, source descriptions,
 body text, and slide cues, even when the request is in another language.
 Create a UTF-8 JSON object with exactly `kind`, `title`, `subtitle`, `closing`,
 `source`, and `sections`. `kind` is `report` (Read and Slides), `slides`

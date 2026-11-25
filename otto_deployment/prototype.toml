@@ -4,7 +4,7 @@ worker = "otto"
 source_repository = "https://github.com/tkubica12/agent-demos"
 source_project = "autopilots-on-azure"
 deadline_utc = "2026-11-27T20:00:00Z"
-language = "en"
+language = "cs"
 
 [azure]
 subscription_id = "673af34d-6b28-41dc-bc7b-f507418045e6"

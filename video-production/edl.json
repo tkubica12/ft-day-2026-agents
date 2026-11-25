@@ -2,5 +2,115 @@
   "fps": 30,
   "crf": 16,
   "preset": "slow",
-  "clips": []
+  "clips": [
+    {
+      "id": "01",
+      "segments": [
+        {"src": "01", "from": 0.0, "to": 17.5},
+        {"src": "01", "from": 17.5, "to": 110.5, "speed": 10, "badge": "Otto připravuje zahájení · 10× zrychleno"},
+        {"src": "01", "from": 110.5, "to": 127.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "02",
+      "segments": [
+        {"src": "02", "from": 0.0, "to": 18.0, "hold": 1.0}
+      ]
+    },
+    {
+      "id": "03",
+      "segments": [
+        {"src": "03", "from": 0.0, "to": 6.5},
+        {"src": "03", "from": 6.5, "to": 74.5, "speed": 10, "badge": "Otto zveřejňuje uvítání · 10× zrychleno"},
+        {"src": "03", "from": 74.5, "to": 84.0, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "04",
+      "segments": [
+        {"src": "04", "from": 0.0, "to": 19.0, "hold": 1.0}
+      ]
+    },
+    {
+      "id": "05",
+      "segments": [
+        {"src": "05", "from": 0.0, "to": 16.0},
+        {"src": "05", "from": 16.0, "to": 22.5, "speed": 3, "badge": "Otto zpracovává dotaz · 3× zrychleno"},
+        {"src": "05", "from": 22.5, "to": 27.0},
+        {"src": "05", "from": 27.0, "to": 97.5, "speed": 10, "badge": "Otto připravuje odpověď a soukromý brief · 10× zrychleno"},
+        {"src": "05", "from": 97.5, "to": 117.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "06",
+      "segments": [
+        {"src": "06", "from": 0.0, "to": 24.0},
+        {"src": "06", "from": 24.0, "to": 87.5, "speed": 9, "badge": "Otto ověřuje pravomoci · 9× zrychleno"},
+        {"src": "06", "from": 87.5, "to": 110.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "07",
+      "segments": [
+        {"src": "07", "from": 0.0, "to": 20.5},
+        {"src": "07", "from": 20.5, "to": 109.5, "speed": 10, "badge": "Otto zaznamenává rozhodnutí · 10× zrychleno"},
+        {"src": "07", "from": 109.5, "to": 133.0, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "08",
+      "segments": [
+        {"src": "07-b", "from": 0.0, "to": 5.5},
+        {"src": "07-b", "from": 5.5, "to": 42.5, "speed": 8, "badge": "Otto navrhuje změnu playbooku · 8× zrychleno"},
+        {"src": "07-b", "from": 42.5, "to": 56.0, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "09",
+      "segments": [
+        {"src": "08", "from": 0.0, "to": 20.5},
+        {"src": "08", "from": 20.5, "to": 38.5, "speed": 4, "badge": "Otto potvrzuje · 4× zrychleno"},
+        {"src": "08", "from": 38.5, "to": 45.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "10",
+      "segments": [
+        {"src": "09", "from": 0.0, "to": 17.0},
+        {"src": "09", "from": 17.0, "to": 45.0, "speed": 6, "badge": "Otto kontroluje stav 3. týdne · 6× zrychleno"},
+        {"src": "09", "from": 45.0, "to": 75.0, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "11",
+      "segments": [
+        {"src": "09-b", "from": 0.0, "to": 10.7, "hold": 1.2}
+      ]
+    },
+    {
+      "id": "12",
+      "segments": [
+        {"src": "10-11", "from": 0.0, "to": 9.0},
+        {"src": "10-11", "from": 9.0, "to": 34.0, "speed": 8, "badge": "Otto staví a testuje aplikaci · 8× zrychleno"},
+        {"src": "10-11", "from": 34.0, "to": 39.0},
+        {"src": "10-11", "from": 39.0, "to": 229.0, "speed": 15, "badge": "Nasazení aplikace v ACA Sandboxu · 15× zrychleno"},
+        {"src": "10-11", "from": 229.0, "to": 252.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "13",
+      "segments": [
+        {"src": "12", "from": 0.0, "to": 5.0},
+        {"src": "12", "from": 5.0, "to": 54.0, "speed": 10, "badge": "Otto odesílá pozvánky · 10× zrychleno"},
+        {"src": "12", "from": 54.0, "to": 60.5, "hold": 1.5}
+      ]
+    },
+    {
+      "id": "14",
+      "segments": [
+        {"src": "13", "from": 0.0, "to": 8.3},
+        {"src": "13", "from": 16.6, "to": 33.7, "hold": 2.0}
+      ]
+    }
+  ]
 }

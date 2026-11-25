@@ -38,9 +38,9 @@ def extract_artifact_request(response: str) -> tuple[str, dict[str, Any] | None]
         raise ValueError("Visual artifact must be an object.")
     title = spec.get("title")
     sections = spec.get("sections")
-    language = spec.get("language", "en")
-    if language != "en":
-        raise ValueError("Artifact language must be English.")
+    language = spec.get("language", "cs")
+    if language not in {"cs", "en"}:
+        raise ValueError("Artifact language must be Czech or English.")
     if not isinstance(title, str) or not title.strip() or len(title) > 120:
         raise ValueError("Artifact title must contain 1 to 120 characters.")
     if not isinstance(sections, list) or not 1 <= len(sections) <= 8:
@@ -64,10 +64,16 @@ def extract_artifact_request(response: str) -> tuple[str, dict[str, Any] | None]
 
 def render_html(spec: dict[str, Any]) -> bytes:
     title = html.escape(spec["title"])
-    language = "en"
-    read, slides, previous, following, fictional = (
-        "Read", "Slides", "Previous", "Next", "Fictional Javorna Group demo data"
-    )
+    language = spec.get("language", "cs")
+    if language == "en":
+        read, slides, previous, following, fictional = (
+            "Read", "Slides", "Previous", "Next", "Fictional Javorna Group demo data"
+        )
+    else:
+        language = "cs"
+        read, slides, previous, following, fictional = (
+            "Čtení", "Slidy", "Předchozí", "Další", "Fiktivní demo data Javorna Group"
+        )
     sections = "".join(
         f'<section class="page"><h2>{html.escape(s["heading"])}</h2>'
         f'<p class="body">{html.escape(s["body"]).replace(chr(10), "<br>")}</p>'

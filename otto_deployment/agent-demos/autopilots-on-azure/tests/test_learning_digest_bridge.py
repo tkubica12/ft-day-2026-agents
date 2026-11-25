@@ -171,14 +171,14 @@ class LearningDigestBridgeTests(unittest.TestCase):
         card = learning_digest_card(digest(), user_id=OWNER, conversation_id=CONVERSATION)
         found = [(title, action) for title, action, _ in actions(card)]
         self.assertEqual(found, [
-            ("Undo", "undo"), ("Approve", "approve"), ("Reject", "reject"),
-            ("Share", "share"), ("Keep only for me", "keep"), ("Discard", "discard"),
-            ("Keep only for me", "keep"), ("Discard", "discard"),
+            ("Vrátit zpět", "undo"), ("Schválit", "approve"), ("Zamítnout", "reject"),
+            ("Sdílet", "share"), ("Ponechat jen pro mě", "keep"), ("Zahodit", "discard"),
+            ("Ponechat jen pro mě", "keep"), ("Zahodit", "discard"),
         ])
-        serialized = json.dumps(card)
-        self.assertIn("Undo unavailable: The skill changed again later", serialized)
-        self.assertIn("Native trace incomplete", serialized)
-        self.assertIn("Strict approval is on", serialized)
+        serialized = json.dumps(card, ensure_ascii=False)
+        self.assertIn("Vrácení není dostupné: The skill changed again later", serialized)
+        self.assertIn("Nativní stopa není úplná", serialized)
+        self.assertIn("Přísné schvalování je zapnuté", serialized)
         self.assertIn("+Report weekly with risks.", serialized)
         self.assertLess(len(serialized.encode("utf-8")), 28_000)
         only_new = learning_digest_card(digest(), user_id=OWNER, conversation_id=CONVERSATION, only_new=True)
@@ -187,9 +187,9 @@ class LearningDigestBridgeTests(unittest.TestCase):
         crowded["changes"] = crowded["changes"][:1] * 20
         crowded["pending"] = crowded["pending"] * 10
         crowded["governed"] = crowded["governed"][:1] * 10
-        large = json.dumps(learning_digest_card(crowded, user_id=OWNER, conversation_id=CONVERSATION))
+        large = json.dumps(learning_digest_card(crowded, user_id=OWNER, conversation_id=CONVERSATION), ensure_ascii=False)
         self.assertLess(len(large.encode("utf-8")), 28_000)
-        self.assertIn("15 more", large)
+        self.assertIn("Dalších 15", large)
 
     def test_learning_command_shows_digest_only_to_the_owner_in_personal_chat(self):
         adapter = FakeAdapter()
@@ -232,7 +232,7 @@ class LearningDigestBridgeTests(unittest.TestCase):
         adapter = FakeAdapter()
         ctx = self.run_owner_turn(adapter)
         self.assertEqual(adapter.calls, [("remember", self.reference), ("digest", True)])
-        self.assertEqual([title for title, _, _ in actions(ctx.sent[0].attachments[0].content)][:1], ["Undo"])
+        self.assertEqual([title for title, _, _ in actions(ctx.sent[0].attachments[0].content)][:1], ["Vrátit zpět"])
 
         quiet = FakeAdapter(digest(new=False))
         self.assertEqual(self.run_owner_turn(quiet).sent, [])
@@ -264,25 +264,25 @@ class LearningDigestBridgeTests(unittest.TestCase):
             LEARNING_ACTION_TOKEN: self.token("undo", "abcdef123456"), LEARNING_ACTION: "undo",
         })
         self.assertEqual(body["statusCode"], 200)
-        self.assertIn("Undo change abcdef123456", json.dumps(body["value"]))
+        self.assertIn("Vrátit změnu abcdef123456", json.dumps(body["value"], ensure_ascii=False))
         self.assertEqual(adapter.calls[0], ("undo", {"entry_id": "abcdef123456", "decided_by": OWNER}))
         self.assertEqual(adapter.calls[1], ("digest", True))
         sent = proactive.await_args.kwargs["activity"]
-        self.assertEqual(sent.text, "Undone: patch of skills/role/status-report.")
-        self.assertEqual(sent.attachments[0].content["body"][0]["text"], "What I learned")
+        self.assertEqual(sent.text, "Vráceno zpět: patch u skills/role/status-report.")
+        self.assertEqual(sent.attachments[0].content["body"][0]["text"], "Co jsem se naučil")
 
         _, proactive = self.click(adapter, {"action": {"data": {
             LEARNING_ACTION_TOKEN: self.token("approve", "1234abcd"), LEARNING_ACTION: "approve",
         }}})
         self.assertEqual(adapter.calls[2], ("pending", {"pending_id": "1234abcd", "approve": True, "decided_by": OWNER}))
-        self.assertTrue(proactive.await_args.kwargs["activity"].text.startswith("Already done earlier."))
+        self.assertTrue(proactive.await_args.kwargs["activity"].text.startswith("Již dříve vyřízeno."))
 
         _, proactive = self.click(adapter, {
             LEARNING_ACTION_TOKEN: self.token("keep", "skills/role/status-report", artifact_hash="a" * 64),
             LEARNING_ACTION: "keep",
         })
         self.assertEqual(adapter.calls[4][1]["artifact_hash"], "a" * 64)
-        self.assertIn("Private Playbook skills/private/status-report-playbook", proactive.await_args.kwargs["activity"].text)
+        self.assertIn("Soukromý playbook skills/private/status-report-playbook", proactive.await_args.kwargs["activity"].text)
 
     def test_runtime_conflict_is_reported_explicitly_to_the_owner(self):
         adapter = FakeAdapter()

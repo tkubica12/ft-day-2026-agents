@@ -13,8 +13,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "video-raw"
+RAW_FALLBACK = ROOT / ".local" / "raw-videos"
 OUT = ROOT / "docs" / "video"
 FONT = "C\\:/Windows/Fonts/seguisb.ttf"
+
+
+def source_path(src: str) -> Path:
+    primary = RAW / f"{src}.mp4"
+    if primary.exists():
+        return primary
+    fallback = RAW_FALLBACK / f"{src}.mp4"
+    if fallback.exists():
+        return fallback
+    return primary
 
 
 def validate(edl: dict) -> None:
@@ -27,7 +38,7 @@ def validate(edl: dict) -> None:
         if not clip["segments"]:
             raise ValueError(f"{cid}: no segments")
         for seg in clip["segments"]:
-            if not re.fullmatch(r"[0-9]{2}", seg["src"]):
+            if not re.fullmatch(r"[0-9]{2}(?:-[0-9a-z]+)?", seg["src"]):
                 raise ValueError(f"{cid}: invalid source ID")
             values = [seg["from"], seg["to"], seg.get("speed", 1), seg.get("hold", 0)]
             if any(type(v) not in (int, float) or not math.isfinite(v) for v in values):
@@ -41,7 +52,7 @@ def validate(edl: dict) -> None:
 def probe_size(src: str) -> tuple[int, int]:
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
-         "-of", "csv=p=0", str(RAW / f"{src}.mp4")],
+         "-of", "csv=p=0", str(source_path(src))],
         check=True, capture_output=True, text=True).stdout.strip()
     w, h = out.split(",")
     return int(w), int(h)
@@ -54,7 +65,7 @@ def build(clip: dict, edl: dict) -> Path:
     args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-stats"]
     chains = []
     for i, seg in enumerate(clip["segments"]):
-        args += ["-ss", f"{seg['from']:.3f}", "-to", f"{seg['to']:.3f}", "-i", str(RAW / f"{seg['src']}.mp4")]
+        args += ["-ss", f"{seg['from']:.3f}", "-to", f"{seg['to']:.3f}", "-i", str(source_path(seg["src"]))]
         f = ["setpts=PTS-STARTPTS"]
         speed = seg.get("speed", 1)
         if speed != 1:

@@ -29,7 +29,7 @@ Use standalone
 visual-artifacts for a requested report, presentation or PDF file, not this
 widget. A full application with hosting is a separate capability.
 
-Return a concise useful English plain-text fallback summary, not a duplicate of
+Return a concise useful Czech plain-text fallback summary, not a duplicate of
 the full explanation, then exactly one JSON request:
 
 ```text
@@ -58,7 +58,7 @@ the full explanation, then exactly one JSON request:
   nested frames, secrets, credentials or background effects. Do not ask for host
   permissions. Local SVG/charts, filtering, sorting, input validation, tabs and
   calculations are appropriate. State when numbers are illustrative.
-- Write all content in English. Use the Javorna Group palette: dark wood text
+- Write all content in Czech. Use the Javorna Group palette: dark wood text
   (`#332E27`), oak secondary text (`#6B5A45`), paper surfaces (`#EEEBDD` or
   white), muted borders (`#CFCCB6`), pine green (`#4C6138`) as the one UI accent
   and leaf green (`#BCCB7A`) only for highlights on dark wood. Use system fonts

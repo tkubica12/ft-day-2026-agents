@@ -247,6 +247,7 @@ def worker_settings(config: dict, platform: dict, infrastructure: dict, endpoint
         "OPERATOR_REHEARSAL_PERSONAS_ENABLED": text(bool(config.get("operator_rehearsal_personas"))),
         "M365_TEAMS_COLLABORATION_ENABLED": text(bool(str(config.get("workiq_teams_mcp_url") or "").strip())),
         "M365_OFFICE_COLLABORATION_ENABLED": text(bool(str(config.get("agent365_agent_user_id") or "").strip())),
+        "TEAMS_HTML_WIDGETS_ENABLED": "true",
         "USE_AGENTIC_AUTH": "true",
         "CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID": config["agent365_client_id"],
         "CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID": tenant,

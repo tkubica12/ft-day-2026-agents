@@ -24,14 +24,18 @@ async function check(browser, file, [width, height]) {
     page.on("requestfailed", request => { if (!/\/video\/\d\d\.mp4$/.test(request.url())) errors.push(request.url()); });
     await page.goto(self + "#1", {waitUntil: "load"});
     const total = await page.locator(".slide").count();
-    assert.equal(total, 32);
-    assert.equal(await page.locator(".slide.video").count(), 13);
+    assert.equal(total, 34);
+    assert.equal(await page.locator(".slide.video").count(), 14);
     const name = path.basename(file, ".html");
     for (let i = 0; i < total; i++) {
       assert.equal(await page.evaluate(() => [...document.querySelectorAll(".slide")].findIndex(s => s.classList.contains("active"))), i);
       assert.equal(await page.locator("#count").textContent(), `${i + 1} / ${total}`);
       if (await page.locator(".slide.active.video").count()) {
-        await page.waitForSelector(".slide.active.missing .pending", {state: "visible", timeout: 5000});
+        await page.waitForFunction(() => {
+          const s = document.querySelector(".slide.active.video");
+          const v = s && s.querySelector("video");
+          return s && (s.classList.contains("missing") || (v && v.readyState >= 1));
+        }, {timeout: 8000});
       }
       await page.evaluate(() => document.fonts.ready);
       const layout = await page.evaluate(() => {
@@ -65,9 +69,11 @@ async function check(browser, file, [width, height]) {
     await page.goto(self + "#5");
     await page.reload();
     assert.equal(await page.evaluate(() => document.querySelector(".slide.active").dataset.title), "01 video");
-    await page.waitForSelector(".slide.active.missing");
-    await page.keyboard.press(" ");
-    assert.equal(await page.evaluate(() => location.hash), "#6", "Space skips a pending clip");
+    const isMissing = await page.evaluate(() => document.querySelector(".slide.active").classList.contains("missing"));
+    if (isMissing) {
+      await page.keyboard.press(" ");
+      assert.equal(await page.evaluate(() => location.hash), "#6", "Space skips a pending clip");
+    }
     assert.deepEqual(errors, []);
     if (file.includes(`${path.sep}dist${path.sep}`)) assert.deepEqual(external, [], "single file needs no other files");
   } finally {
@@ -79,7 +85,7 @@ async function main() {
   const browser = await playwright().chromium.launch({executablePath: chromiumPath()});
   try {
     for (const file of files) for (const viewport of viewports) await check(browser, file, viewport);
-    console.log(`Player passed: ${files.length} file(s), ${viewports.length} viewports, 32 slides each, offline.`);
+    console.log(`Player passed: ${files.length} file(s), ${viewports.length} viewports, 34 slides each, offline.`);
   } finally {
     await browser.close();
   }

@@ -152,9 +152,9 @@ def decode_submission(value: object, *, conversation_id: str) -> tuple[dict[str,
 
 def tool_result(*, data: dict[str, Any] | None = None, error: str = "") -> dict[str, Any]:
     accepted = (
-        "Selection received and queued. Otto will reply in this chat."
+        "Volba přijata a zařazena do fronty. Otto odpoví v tomto chatu."
         if (data or {}).get("status") == "queued"
-        else "Selection accepted. Otto will reply in this chat."
+        else "Volba přijata. Otto odpoví v tomto chatu."
     )
     return {
         "responseType": "htmlwidget/calltoolresult",
@@ -173,24 +173,24 @@ BOOTSTRAP = r"""
   const status = document.getElementById('autopilot-status');
   const post = message => parent.postMessage({jsonrpc:'2.0',...message},'*');
   let ready = false, submitted = false, pending = null, sequence = 0;
-  const timeout = setTimeout(() => {status.textContent='Teams did not initialize this widget.';},15000);
+  const timeout = setTimeout(() => {status.textContent='Teams neinicializovaly tento widget.';},15000);
   const values = () => Object.fromEntries([...root.querySelectorAll('[data-widget-field]')].map(field => [
     field.dataset.widgetField, field.type==='checkbox' ? String(field.checked) : String(field.value ?? '')
   ]));
   const submit = (actionId, fields = values()) => {
-    if (!ready) return Promise.reject(new Error('The widget is not initialized.'));
-    if (!navigator.userActivation.isActive) return Promise.reject(new Error('Use a button to submit this selection.'));
-    if (submitted) return Promise.reject(new Error('This widget already submitted a selection.'));
+    if (!ready) return Promise.reject(new Error('Widget není inicializovaný.'));
+    if (!navigator.userActivation.isActive) return Promise.reject(new Error('Pro odeslání volby použijte tlačítko.'));
+    if (submitted) return Promise.reject(new Error('Tento widget už volbu odeslal.'));
     if (pending) return pending.promise;
-    if (!Object.hasOwn(config.tokens,actionId)) return Promise.reject(new Error('Unknown widget action.'));
+    if (!Object.hasOwn(config.tokens,actionId)) return Promise.reject(new Error('Neznámá akce widgetu.'));
     const id = 'selection-' + (++sequence);
     let resolve, reject;
     const promise = new Promise((ok,fail) => {resolve=ok;reject=fail;});
     const timer=setTimeout(() => {
-      if (pending?.id===id) {pending=null;status.textContent='No acknowledgement. Retry the same selection; it will not execute twice.';reject(new Error('No gateway acknowledgement.'));}
+      if (pending?.id===id) {pending=null;status.textContent='Bez potvrzení. Zkuste volbu odeslat znovu; neprovede se dvakrát.';reject(new Error('Bez potvrzení z gateway.'));}
     },20000);
     pending={id,promise,resolve,reject,timer};
-    status.textContent='Sending selection to Otto...';
+    status.textContent='Odesílám volbu Ottovi...';
     post({id,method:'tools/call',params:{name:'autopilot.widget.submit',arguments:{token:config.tokens[actionId],values:fields}}});
     return promise;
   };
@@ -204,24 +204,24 @@ BOOTSTRAP = r"""
     if (event.source!==parent || event.data?.jsonrpc!=='2.0') return;
     const data=event.data;
     if (data.id==='init' && !ready) {
-      if (data.error) {clearTimeout(timeout);status.textContent='Teams rejected widget initialization.';return;}
+      if (data.error) {clearTimeout(timeout);status.textContent='Teams odmítly inicializaci widgetu.';return;}
       if (!data.result) return;
       clearTimeout(timeout);ready=true;
       post({method:'ui/notifications/initialized',params:{}});
       const report=()=>post({method:'ui/notifications/size-changed',params:{height:root.getBoundingClientRect().height}});
       new ResizeObserver(report).observe(root);report();
-      status.textContent='Interactive preview. Submitting a selection asks Otto; it does not approve an external action.';
-      try { MODEL_SCRIPT } catch (error) {status.textContent='Widget script failed: '+error.message;}
+      status.textContent='Interaktivní náhled. Odeslání volby předá dotaz Ottovi; neschvaluje externí akci.';
+      try { MODEL_SCRIPT } catch (error) {status.textContent='Chyba skriptu widgetu: '+error.message;}
     }
     if (pending && data.id===pending.id) {
       const call=pending;pending=null;clearTimeout(call.timer);
       if (data.error || data.result?.isError) {
-        const message=data.error?.message || data.result?.content?.[0]?.text || 'Gateway rejected the selection.';
+        const message=data.error?.message || data.result?.content?.[0]?.text || 'Gateway volbu odmítla.';
         status.textContent=message;call.reject(new Error(message));return;
       }
       submitted=true;
       root.querySelectorAll('[data-hermes-action]').forEach(button=>button.disabled=true);
-      status.textContent='Selection received. Otto will reply in this chat.';
+      status.textContent='Volba přijata. Otto odpoví v tomto chatu.';
       call.resolve(data.result);
     }
   });
@@ -263,7 +263,7 @@ def render_widget(
     config = json.dumps({"tokens": tokens}).replace("<", "\\u003c")
     script = BOOTSTRAP.replace("CONFIG", config).replace("MODEL_SCRIPT", spec["javascript"])
     markup = (
-        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
         f'<meta http-equiv="Content-Security-Policy" content="{html.escape(POLICY, quote=True)}">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<style>body{margin:0;font:16px system-ui,"DejaVu Sans",sans-serif;color:#332E27;background:white}'
@@ -274,7 +274,7 @@ def render_widget(
         f'{spec["css"]}</style></head><body><main id="autopilot-root">'
         f'<header id="autopilot-brand"><img alt="Javorna Group" src="data:image/svg+xml;base64,{base64.b64encode(logo).decode()}">'
         f'<p>{html.escape(brand["disclaimer"])}</p></header>'
-        f'{spec["html"]}<p id="autopilot-status" role="status">Connecting to Teams...</p>'
+        f'{spec["html"]}<p id="autopilot-status" role="status">Připojování k Teams...</p>'
         f'</main><script>{script}</script></body></html>'
     )
     payload = {

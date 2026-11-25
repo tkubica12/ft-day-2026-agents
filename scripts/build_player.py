@@ -16,64 +16,69 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "player.html"
 
 PEOPLE = {
-    "Adam": ("av", "Group CFO. Owns targets, exceptions and what Otto learns."),
-    "Emma": ("eh", "Group FP&A lead. Owns the process and the calendar."),
-    "Piotr": ("pn", "Managing director, Poland. Owns the Polish budget."),
-    "Otto": ("oa", "Budget season coordinator. A digital junior in Teams."),
+    "Adam": ("av", "Skupinový CFO. Vlastní cíle, výjimky i to, co se Otto smí naučit."),
+    "Emma": ("eh", "Vedoucí skupinového FP&A. Vlastní proces a harmonogram."),
+    "Piotr": ("pn", "Výkonný ředitel, Polsko. Vlastní rozpočet Polska."),
+    "Otto": ("oa", "Koordinátor rozpočtové sezóny. Digitální junior v Teams."),
 }
 CAST_ORDER = ("Adam", "Emma", "Piotr", "Otto")
 
 # Player copy per scene: kicker, who (person, arrow?, text), video title. The message itself comes
 # from the scenario; scenes without a message use "watch" or "heading"/"lead".
 STEPS = {
-    "01": {"kicker": "Kickoff", "who": ("Adam", True, "Otto, private chat"),
-           "video": "Adam gives Otto the goal",
-           "sub": "Otto checks the plan, contacts Emma and replies with a summary"},
-    "02": {"kicker": "Handoff to the process owner", "who": ("Emma", False, "opens her chat with Otto"),
-           "watch": "Nobody asked Emma to do anything yet. Otto has already written to her.",
-           "video": "Emma receives Otto's handoff"},
-    "03": {"kicker": "Inform the countries", "who": ("Adam", True, "Otto"),
-           "video": "Otto posts the welcome and confirms it"},
-    "04": {"kicker": "The team channel", "who": ("Piotr", False, "sees a new mention"),
-           "watch": "One welcome for the whole team, in the channel, with no country figures.",
-           "video": "Piotr opens the welcome in Javorna Budget Season"},
-    "05": {"kicker": "A question in the thread", "who": ("Piotr", True, "reply in the welcome thread"),
-           "video": "Answer in the thread, Poland-only brief in private"},
-    "06": {"kicker": "Pressure", "who": ("Piotr", True, "Otto, private chat"),
-           "video": "A claim is not a decision"},
-    "07": {"kicker": "The CFO decides", "who": ("Adam", True, "Otto"), "then": "Approve",
-           "video": "Decision recorded; Otto asks before it learns"},
-    "08": {"kicker": "Back with Piotr", "who": ("Piotr", False, "reads the decision and replies"),
-           "video": "Piotr receives Adam's decision and confirms the next step"},
-    "09": {"kicker": "Status for the team", "who": ("Emma", True, "Otto, private chat"),
-           "video": "Three countries have submitted; Slovakia is overdue"},
-    "10": {"kicker": "Emma needs a booking page", "who": ("Emma", True, "Otto, same chat"),
-           "video": "Emma proposes a booking page for the challenge sessions"},
-    "11": {"kicker": "From a sentence to an app", "who": ("Emma", True, "Otto, private chat"),
-           "video": "Otto builds, tests and deploys the booking app"},
-    "12": {"kicker": "Otto sends the link", "who": ("Emma", True, "Otto, private chat"),
-           "video": "Otto confirms two private messages: Piotr to book, Adam for read-only visibility"},
-    "13": {"kicker": "The invitation reaches Piotr", "who": ("Piotr", True, "Otto's private message"),
-           "heading": "From a Teams invitation to a 45-minute slot",
-           "lead": "Piotr opens the app, chooses Poland and a free slot, and confirms the booking.",
-           "video": "Piotr books Poland's challenge session"},
+    "01": {"kicker": "Zahájení", "who": ("Adam", True, "Otto, soukromý chat"),
+           "video": "Adam zadá Ottovi cíl",
+           "sub": "Otto zkontroluje plán, kontaktuje Emmu a pošle shrnutí"},
+    "02": {"kicker": "Předání vlastníkovi procesu", "who": ("Emma", False, "otevře chat s Ottem"),
+           "watch": "Emmě ještě nikdo nepsal. Otto jí už sám předal úkoly a harmonogram.",
+           "video": "Emma dostává předání od Otta"},
+    "03": {"kicker": "Informovat země", "who": ("Adam", True, "Otto"),
+           "video": "Otto zveřejní uvítání v kanálu a potvrdí ho"},
+    "04": {"kicker": "Týmový kanál", "who": ("Piotr", False, "vidí novou zmínku"),
+           "watch": "Jedno uvítání pro celý tým v kanálu, bez soukromých čísel zemí.",
+           "video": "Piotr otevírá uvítání v Javorna Budget Season"},
+    "05": {"kicker": "Dotaz ve vlákně", "who": ("Piotr", True, "odpověď v uvítacím vlákně"),
+           "video": "Odpověď ve vlákně, polský brief v soukromém chatu"},
+    "06": {"kicker": "Tlak na výjimku", "who": ("Piotr", True, "Otto, soukromý chat"),
+           "video": "Tvrzení není rozhodnutí"},
+    "07": {"kicker": "CFO rozhoduje", "who": ("Adam", True, "Otto"),
+           "video": "Ohraničené rozhodnutí DEC-001 zapsáno a předáno Piotrovi"},
+    "08": {"kicker": "Řízené učení", "who": ("Adam", True, "Otto, soukromý chat"),
+           "then_label": "Poté v kartě \u201eCo jsem se naučil\u201c", "then": "Schválit",
+           "video": "Otto navrhne změnu playbooku; CFO schválí diff"},
+    "09": {"kicker": "Zpět u Piotra", "who": ("Piotr", False, "čte rozhodnutí a odpovídá"),
+           "video": "Piotr obdrží Adamovo rozhodnutí a potvrdí další krok"},
+    "10": {"kicker": "Přehled a schválení pro kanál", "who": ("Emma", True, "Otto, soukromý chat"),
+           "then_label": "Poté ve schvalovací kartě", "then": "Confirm",
+           "video": "Tři země odevzdaly; Emma schválí zveřejnění do kanálu"},
+    "11": {"kicker": "Zveřejněno v kanálu", "who": ("Otto", False, "zveřejnil schválený přehled v General"),
+           "watch": "V kanálu General je sdílený přehled 3. týdne — bez soukromých čísel zemí.",
+           "video": "Schválený týdenní přehled v kanálu Javorna Budget Season"},
+    "12": {"kicker": "Z jedné zprávy vznikne aplikace", "who": ("Emma", True, "Otto, soukromý chat"),
+           "video": "Otto vytvoří, otestuje a nasadí rezervační aplikaci"},
+    "13": {"kicker": "Otto rozesílá odkaz", "who": ("Emma", True, "Otto, soukromý chat"),
+           "video": "Otto potvrdí dvě soukromé zprávy: Piotrovi k rezervaci, Adamovi pro čtení"},
+    "14": {"kicker": "Pozvánka dorazí k Piotrovi", "who": ("Piotr", True, "soukromá zpráva od Otta"),
+           "heading": "Z pozvánky v Teams ke 45minutovému slotu",
+           "lead": "Piotr otevře aplikaci, vybere Polsko a volný termín a potvrdí rezervaci.",
+           "video": "Piotr rezervuje challenge schůzku za Polsko"},
 }
 
 WEEKS = [
-    ("Week 1", "Kickoff, private briefs"), ("Week 2", "Submissions due"),
-    ("Week 3", "Validation and queries"), ("Week 4", "Challenge sessions"),
-    ("Week 5", "CFO adjustments, capex review"), ("Week 6", "Revised submissions"),
-    ("Week 7", "Consolidation, board pack"), ("Week 8", "Board approval"),
+    ("1. týden", "Zahájení, soukromé briefy"), ("2. týden", "Termín odevzdání"),
+    ("3. týden", "Validace a dotazy"), ("4. týden", "Challenge schůzky"),
+    ("5. týden", "Úpravy CFO, capex review"), ("6. týden", "Upravené návrhy"),
+    ("7. týden", "Konsolidace, podklady"), ("8. týden", "Schválení představenstvem"),
 ]
 
 RECAP = [
-    ("Who starts the work", "a user asks", "a trigger", "its user", "a goal given once; Otto drives it"),
-    ("Horizon", "one conversation", "one predefined path", "one person's tasks", "eight weeks, many people"),
-    ("Exceptions", "answers questions", "breaks or escalates", "asks its user",
-     "re-plans, asks the person who decides"),
-    ("Whose interests", "the person asking", "the process designer", "one person",
-     "the organisation, within decision rights"),
-    ("Learning", "none", "redesign by IT", "personal preferences", "working procedures, approved by the boss"),
+    ("Kdo spouští práci", "uživatel se zeptá", "pevný trigger", "jeho uživatel", "cíl zadaný jednou; Otto ho táhne"),
+    ("Horizont", "jedna konverzace", "jedna pevná trasa", "úkoly jedné osoby", "osm týdnů, více lidí"),
+    ("Výjimky", "odpovídá na dotazy", "spadne nebo eskaluje", "ptá se uživatele",
+     "přeplánuje, ptá se toho, kdo rozhoduje"),
+    ("V čím zájmu", "tazatele", "autora procesu", "jedné osoby",
+     "organizace v rámci rozhodovacích práv"),
+    ("Učení", "žádné", "předělání přes IT", "osobní preference", "pracovní postupy schválené šéfem"),
 ]
 
 CSS = """
@@ -139,6 +144,7 @@ CSS = """
     border-radius: 3px; font-size: clamp(18px, 2vw, 30px); line-height: 1.45; color: var(--wood);
     box-shadow: 0 2px 14px rgba(51,46,39,.07); }
   blockquote.long { font-size: clamp(16px, 1.7vw, 26px); }
+  blockquote.xlong { font-size: clamp(13px, 1.4vw, 21px); line-height: 1.36; padding: 1.6vh 1.8vw; }
   .then { font-size: clamp(16px, 1.6vw, 22px); color: var(--oak); margin: -1.5vh 0 3vh; }
   .then b { color: var(--pine); }
   ul.watch { margin: 0; padding: 0; list-style: none; font-size: clamp(17px, 1.8vw, 26px); line-height: 1.5; }
@@ -311,7 +317,7 @@ SCRIPT = """
 """
 
 BRAND = '<div class="brand"><span class="mark" aria-hidden="true"></span>JAVORNA</div>'
-NUMBERS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+NUMBERS = ("žádná", "jedna", "dvě", "tři", "čtyři", "pět", "šest", "sedm", "osm", "devět", "deset")
 
 
 def initials(name):
@@ -334,10 +340,10 @@ def text_slide(title, body, classes=""):
 
 def scene_slides(number, scene, people):
     sid, step = scene["id"], STEPS[scene["id"]]
-    body = f'<div class="kicker">Step {number} \u00b7 {esc(step["kicker"])}</div>' + who(people, *step["who"])
+    body = f'<div class="kicker">Krok {number} \u00b7 {esc(step["kicker"])}</div>' + who(people, *step["who"])
     if scene["prompt"]:
-        long = ' class="long"' if len(scene["prompt"]) > 300 else ""
-        body += f'<blockquote{long}>{esc(scene["prompt"])}</blockquote>'
+        cls = ' class="xlong"' if len(scene["prompt"]) > 550 else (' class="long"' if len(scene["prompt"]) > 300 else "")
+        body += f'<blockquote{cls}>{esc(scene["prompt"]).replace(chr(10), "<br>")}</blockquote>'
     elif "watch" in step:
         body += f'<ul class="watch"><li>{esc(step["watch"])}</li></ul>'
     elif "heading" in step:
@@ -345,15 +351,16 @@ def scene_slides(number, scene, people):
     else:
         raise ValueError(f"scene {sid} has no message and no player copy")
     if "then" in step:
-        body += f'<p class="then">Then, in \u201cWhat I learned\u201d: <b>{esc(step["then"])}</b></p>'
+        label = step.get("then_label", "Poté v kartě \u201eCo jsem se naučil\u201c")
+        body += f'<p class="then">{esc(label)}: <b>{esc(step["then"])}</b></p>'
     sub = f'<span class="sub">\u00b7 {esc(step["sub"])}</span>' if "sub" in step else ""
     video = (
         f'<section class="slide video dark" data-title="{sid} video" data-video="video/{sid}.mp4">'
         f'<div class="vbar"><span class="tag">{sid}</span>{esc(step["video"])}{sub}'
         '<span class="mark" aria-hidden="true"></span></div>'
         '<div class="vwrap"><video muted playsinline preload="auto" controls></video>'
-        f'<div class="pending"><b>Recording pending</b><span>{esc(scene["cue"])}</span></div>'
-        '<div class="ended-hint">\u2192 next</div></div></section>\n'
+        f'<div class="pending"><b>Čeká na nahrání</b><span>{esc(scene["cue"])}</span></div>'
+        '<div class="ended-hint">\u2192 další</div></div></section>\n'
     )
     return f"\n<!-- ============ {sid} ============ -->\n" + text_slide(f"{sid} {step['kicker']}", body) + video
 
@@ -371,22 +378,22 @@ def build(data):
     presenters = "".join(f'<b>{esc(p["name"])}</b>' for p in data["presenters"])
 
     page = (
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        '<!doctype html>\n<html lang="cs">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f'<title>Otto at {esc(data["company"])} \u2013 the budget season, recorded</title>\n'
+        f'<title>Otto ve skupině {esc(data["company"])} \u2013 nahraná rozpočtová sezóna</title>\n'
         f'<style>{CSS}</style>\n</head>\n<body>\n'
     )
     page += (
         '\n<!-- ============ OPENING ============ -->\n'
-        '<section class="slide text title dark" data-title="Title">'
+        '<section class="slide text title dark" data-title="Úvod">'
         '<img class="title-photo" src="assets/javorna/atelier-title.jpg" width="1100" height="1502" '
-        'alt="AI-generated fictional woodworking atelier">'
+        'alt="AI vygenerovaný fiktivní truhlářský ateliér">'
         '<div class="title-copy"><div class="brand"><span class="mark" aria-hidden="true"></span>'
-        '<div>JAVORNA<small>BESPOKE WOODWORK</small></div></div>'
-        f'<div class="title-main"><div class="kicker">{esc(data["event"])} \u00b7 recorded demo</div>'
-        '<h1><em>Otto</em> runs the budget season</h1>'
-        '<p class="lead">One goal from the Group CFO. A digital junior that runs the season, '
-        'learns with approval and builds an app when needed.</p></div>'
+        '<div>JAVORNA<small>ZAKÁZKOVÉ TRUHLÁŘSTVÍ</small></div></div>'
+        f'<div class="title-main"><div class="kicker">{esc(data["event"])} \u00b7 nahrané demo</div>'
+        '<h1><em>Otto</em> řídí rozpočtovou sezónu</h1>'
+        '<p class="lead">Jeden cíl od skupinového CFO. Digitální junior, který řídí sezónu, '
+        'učí se se schválením a postaví aplikaci, když je potřeba.</p></div>'
         f'<div class="presenter">{presenters}<span class="logo-box">'
         '<img class="logo" src="assets/microsoft-on-dark.svg" width="337.6" height="72" alt="Microsoft">'
         '</span></div></div></section>\n'
@@ -395,30 +402,30 @@ def build(data):
         f'<div class="person"><span class="avatar {PEOPLE[n][0]}">{initials(people[n])}</span>'
         f'<b>{esc(people[n])}</b><span>{esc(PEOPLE[n][1])}</span></div>' for n in CAST_ORDER
     )
-    page += text_slide("Cast", '<div class="kicker">Who is in the story</div><h2>Three people and Otto</h2>'
+    page += text_slide("Obsazení", '<div class="kicker">Kdo vystupuje v příběhu</div><h2>Tři lidé a Otto</h2>'
                        f'<div class="cast">{cards}</div>'
-                       f'<p class="note">{esc(data["company"])}, its people and all figures are fictional.</p>',
+                       f'<p class="note">{esc(data["company"])}, její lidé i všechna čísla jsou fiktivní.</p>',
                        " wide")
     weeks = "".join(f'<div class="wk{" now" if i == 0 else ""}"><b>{esc(w)}</b><span>{esc(t)}</span></div>'
                     for i, (w, t) in enumerate(WEEKS))
     countries = len(data["countries"])
-    page += text_slide("Season", '<div class="kicker">The job</div>'
-                       f'<h2>{esc(seed["fiscal_year"])} budget season: eight weeks, '
-                       f'{NUMBERS[countries]} countries</h2>'
+    page += text_slide("Sezóna", '<div class="kicker">Zadání</div>'
+                       f'<h2>Rozpočtová sezóna {esc(seed["fiscal_year"])}: osm týdnů, '
+                       f'{NUMBERS[countries]} země</h2>'
                        f'<div class="weeks">{weeks}</div>', " wide")
 
     for number, scene in enumerate(data["scenes"], 1):
-        if scene["id"] == "09":
+        if scene["id"] == "10":
             facts = [
-                (f'{len(seed["week_3_submitted"])} of {countries}', "submissions in"),
-                (", ".join(seed["week_3_overdue"]), "still missing"),
-                ("1", "CFO decision on record"),
-                ("Week 4", "challenge sessions"),
+                (f'{len(seed["week_3_submitted"])} ze {countries}', "odevzdáno"),
+                (", ".join(seed["week_3_overdue"]), "stále chybí"),
+                ("1", "rozhodnutí CFO v záznamu"),
+                ("4. týden", "challenge schůzky"),
             ]
             page += "\n<!-- ============ TIME JUMP ============ -->\n" + text_slide(
-                "Two weeks later",
-                '<div class="kicker">Time jump</div><h1>Two weeks later</h1>'
-                '<p class="lead">Week 3: validation. Challenge sessions start next week.</p>'
+                "O dva týdny později",
+                '<div class="kicker">Časový skok</div><h1>O dva týdny později</h1>'
+                '<p class="lead">3. týden: validace. Příští týden začínají challenge schůzky.</p>'
                 '<div class="facts">' + "".join(f'<div class="fact"><b>{esc(b)}</b>{esc(t)}</div>' for b, t in facts)
                 + '</div>', " jump")
         page += scene_slides(number, scene, people)
@@ -428,21 +435,21 @@ def build(data):
         return f"<{tag}{otto}>{esc(value)}</{tag}>"
 
     head = "".join(cell("th", i, h) for i, h in
-                   enumerate(("Chatbot", "Fixed workflow", "Personal assistant", "Digital junior (Otto)")))
+                   enumerate(("Chatbot", "Pevné workflow", "Osobní asistent", "Digitální junior (Otto)")))
     rows = "".join("<tr><th>" + esc(r[0]) + "</th>" + "".join(cell("td", i, c) for i, c in enumerate(r[1:]))
                    + "</tr>" for r in RECAP)
     page += "\n<!-- ============ RECAP ============ -->\n" + text_slide(
-        "Recap", '<div class="kicker">What was different</div>'
-        '<h2>Chatbot, workflow, assistant \u2013 or a digital junior</h2>'
+        "Shrnutí", '<div class="kicker">V čem byl rozdíl</div>'
+        '<h2>Chatbot, workflow, asistent \u2013 nebo digitální junior</h2>'
         f'<table class="recap"><thead><tr><th></th>{head}</tr></thead><tbody>{rows}</tbody></table>', " wide")
     page += (
-        '<section class="slide text wide closing dark" data-title="End"><div class="card">'
+        '<section class="slide text wide closing dark" data-title="Závěr"><div class="card">'
         f'<span class="mark" aria-hidden="true"></span><div class="kicker">{esc(data["event"])}</div>'
-        '<h1>Thank you</h1></div></section>\n\n'
+        '<h1>Děkujeme</h1></div></section>\n\n'
         '<div class="progress" id="progress"></div>\n'
-        '<div class="help">\u2190 \u2192 / PgUp PgDn navigate \u00b7 Space play/pause \u00b7 R replay \u00b7 F full screen</div>\n'
-        '<div class="nav"><button id="prev" title="Previous">\u25c0</button><span id="count"></span>'
-        '<button id="next" title="Next">\u25b6</button></div>\n\n'
+        '<div class="help">\u2190 \u2192 / PgUp PgDn posun \u00b7 Mezerník přehrát/pauza \u00b7 R znovu \u00b7 F celá obrazovka</div>\n'
+        '<div class="nav"><button id="prev" title="Předchozí">\u25c0</button><span id="count"></span>'
+        '<button id="next" title="Další">\u25b6</button></div>\n\n'
         f'<script>{SCRIPT}</script>\n</body>\n</html>\n'
     )
     return page

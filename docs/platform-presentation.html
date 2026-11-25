@@ -188,6 +188,7 @@
 
 <!-- 3. Shared deck runtime. -->
 <link rel="stylesheet" href="assets/deck.css">
+<link rel="stylesheet" href="assets/compositions.css">
 <script src="assets/deck.js" defer></script>
 <style>
 .figure img.pareto-img { width: 100%; height: auto; border: 0; border-radius: 0; }
@@ -197,6 +198,57 @@
 .summary-item--wide li { position: relative; padding-left: 20px; font-size: 21px; line-height: 1.4; color: var(--text); }
 .summary-item--wide li::before { content: ""; position: absolute; left: 0; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .summary-item--wide li strong { font-weight: 640; color: var(--text); }
+/* Full-bleed 16:9 section dividers using canonical .composition--hero tokens. */
+.slide--hero { padding: 0; background: var(--surface); }
+.slide--hero > .slide-body { display: flex; flex: 1; min-height: 0; }
+.slide--hero .composition--hero {
+  max-height: none;
+  height: 100%;
+  width: 100%;
+  border-radius: 0;
+  padding: 68px 72px;
+  aspect-ratio: auto;
+}
+.slide--hero .composition--hero::before {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface) 40%,
+    color-mix(in srgb, var(--surface) 78%, transparent) 48%,
+    color-mix(in srgb, var(--surface) 22%, transparent) 58%,
+    transparent 69%);
+}
+.slide--hero .composition--hero > .composition-copy {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.slide--hero .composition-copy::before {
+  content: "";
+  width: 64px;
+  height: 5px;
+  background: var(--accent);
+  margin-bottom: 4px;
+}
+.slide--hero .composition-copy .slide-eyebrow { margin: 0; }
+.slide--hero .composition-copy h2 {
+  margin: 0;
+  font-size: 50px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  font-weight: 660;
+  color: var(--text);
+}
+.slide--hero#s-demo .composition-copy h2 {
+  font-size: 64px;
+  letter-spacing: 0.03em;
+}
+.slide--hero .composition-copy .slide-lead {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.42;
+  color: var(--text-muted);
+  max-width: 19em;
+}
 @media screen {
   [data-theme="dark"] .figure img.pareto-img--light,
   :root:not([data-theme])[data-default-theme="dark"] .figure img.pareto-img--light { display: none; }
@@ -224,9 +276,19 @@
   </section>
 
   <!-- 2. Live Demo transition -->
-  <section class="slide slide--section" id="s-demo">
-    <h2>DEMO</h2>
-    <p class="slide-lead">Javorna Group a Otto Autopilot: rozpočtová sezóna v Teams, čtyři země a vlastní aplikace.</p>
+  <section class="slide slide--section slide--hero" id="s-demo">
+    <div class="slide-body">
+      <div class="composition composition--hero">
+        <div class="composition-media">
+          <img src="assets/dividers/demo-showroom.png" alt="Luxusní dřevěný showroom Javorna s točitým dubovým schodištěm a masivním nábytkem v teplém světle." width="3840" height="2160">
+        </div>
+        <div class="composition-copy">
+          <p class="slide-eyebrow">Živá ukázka · Javorna Group</p>
+          <h2>DEMO</h2>
+          <p class="slide-lead">Otto Autopilot v&nbsp;rozpočtové sezóně: Teams, čtyři země a&nbsp;vlastní aplikace.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 3. Architecture map: Two sides of the same coin -->
@@ -286,9 +348,19 @@
   </section>
 
   <!-- 3. Section 1: Harness & Where Agents Run -->
-  <section class="slide slide--section" id="s-sec-harness">
-    <h2>Motor pod kapotou</h2>
-    <p class="slide-lead">Copilot Harness v Rustu, kde agenti běží a otevřený Hermes Enterprise.</p>
+  <section class="slide slide--section slide--hero" id="s-sec-harness">
+    <div class="slide-body">
+      <div class="composition composition--hero">
+        <div class="composition-media">
+          <img src="assets/dividers/motor-pod-kapotou.png" alt="Ručně vyřezávaný dřevěný model auta s otevřenou kapotou a lesklým chromovaným motorem." width="3840" height="2160">
+        </div>
+        <div class="composition-copy">
+          <p class="slide-eyebrow">Část 01 · Architektura běhu</p>
+          <h2>Motor pod kapotou</h2>
+          <p class="slide-lead">Copilot Harness v&nbsp;Rustu, kde agenti běží a&nbsp;otevřený Hermes Enterprise.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 4. Microsoft Copilot Harness in Rust across three surfaces -->
@@ -440,9 +512,19 @@
   </section>
 
   <!-- 7. Section 2: M365 Collaboration & App Hosting -->
-  <section class="slide slide--section" id="s-sec-runtime">
-    <h2>Spolupráce v M365 a provoz aplikací</h2>
-    <p class="slide-lead">Autopilot, Workspaces, hosting aplikace a shrnutí M365 SaaS vs. Azure.</p>
+  <section class="slide slide--section slide--hero" id="s-sec-runtime">
+    <div class="slide-body">
+      <div class="composition composition--hero">
+        <div class="composition-media">
+          <img src="assets/dividers/boardroom-spoluprace.png" alt="Večerní dřevěná zasedací místnost v Praze s týmem spolupracujícím nad vzorky dřeva a výhledem na Pražský hrad." width="3840" height="2160">
+        </div>
+        <div class="composition-copy">
+          <p class="slide-eyebrow">Část 02 · Týmový provoz</p>
+          <h2>Spolupráce v&nbsp;M365<br>a&nbsp;provoz aplikací</h2>
+          <p class="slide-lead">Autopilot, Workspaces, hosting aplikace a&nbsp;shrnutí M365 SaaS vs. Azure.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 8. Autopilot + Copilot Workspaces -->
@@ -543,9 +625,19 @@
   </section>
 
   <!-- 11. Section 3: Multi-model & Economics -->
-  <section class="slide slide--section" id="s-sec-models">
-    <h2>Multi-model a ekonomika</h2>
-    <p class="slide-lead">Proč nevsázet na jednoho tvůrce modelu a jak funguje Pareto hranice.</p>
+  <section class="slide slide--section slide--hero" id="s-sec-models">
+    <div class="slide-body">
+      <div class="composition composition--hero">
+        <div class="composition-media">
+          <img src="assets/dividers/chair-gallery.png" alt="Třípatrová podsvícená dřevěná vitrína s pestrou škálou židlí od jednoduché stoličky po luxusní a výstřední křesla." width="3840" height="2160">
+        </div>
+        <div class="composition-copy">
+          <p class="slide-eyebrow">Část 03 · Volba modelů</p>
+          <h2>Multi-model<br>a&nbsp;ekonomika</h2>
+          <p class="slide-lead">Proč nevsázet na jednoho tvůrce modelu a&nbsp;jak funguje Pareto hranice.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 12. Multi-model reality -->

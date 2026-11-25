@@ -1,194 +1,43 @@
-# Frontier Day 2026: Otto at Javorna
+# Frontier Day 2026: Otto ve skupině Javorna Group
 
-Private preparation for the 26 November 2026 presentation. Do not make this
-repository public until the owner explicitly requests it after the event.
+Materiály, scénář, návod a přehrávač k českému demu **Otto Autopilot ve skupině Javorna Group** (26. listopadu 2026).
 
-**Javorna Group is fictional.** It makes bespoke luxury furniture, sculptural
-woodwork and architectural joinery for homes, representative spaces and offices,
-with specialist commissions for churches, heritage restoration and film sets.
-Its four country units are Czechia, Slovakia, Poland and Hungary. All financial
-amounts, projects and process events in this repository are synthetic.
+> **Javorna Group je fiktivní společnost** (zakázkový luxusní nábytek a umělecké truhlářství; pobočky Česko, Slovensko, Polsko, Maďarsko). Všechny osoby, projekty i finanční údaje jsou fiktivní.
 
-## What exists
+## Kde najít přehrávač a prezentaci
 
-- `scenario/demo.json`: cast, synthetic scenario, prompts and recording outcomes.
-- `docs/presentation.html`: slide-first presentation skeleton, with recording slots.
-- `docs/player.html`: recorded-demo player (Penta player structure, Javorna design); each scene slot shows "Recording pending" until `docs/video/NN.mp4` exists.
-- `docs/demo-guide.html`: concise operator guide; prompts and expected results.
-- `video-production/`: EDL-based FFmpeg cutter; raw recordings remain immutable.
-- `.github/skills/`: portable HTML/image authoring skills and local recording/playbook skills.
-- `brand/`: image briefs and the selected identity record. Unapproved generated candidates and their manifests stay local.
+| Soubor | Popis |
+|---|---|
+| `docs/player.html` | **Hlavní demo přehrávač** (34 slidů + 14 sestříhaných videí z `docs/video/01.mp4`–`14.mp4`). Ovládání: `←`/`→` posun, `Mezerník` přehrát/pauza, `R` znovu, `F` celá obrazovka. |
+| `dist/Javorna-demo-player-presentation.html` | Jednosouborový přehrávač v plné kvalitě (CRF 16) pro promítání *(lokální build, mimo Git)*. |
+| `dist/Javorna-demo-player-single-file.html` | Zmenšený jednosouborový přehrávač pro poslání e-mailem *(lokální build, mimo Git)*. |
+| `docs/presentation.html` | Statická kostra prezentace (34 slidů, `html-docs` deck). |
+| `docs/demo-guide.html` | Návod k nahrávání dema se všemi 14 českými prompty a očekávanými výsledky. |
+| `scenario/demo.json` | Zdrojový scénář (obsazení, čísla, prompty a scény `01`–`14`). |
 
-There are **no recordings, screenshots, provisioned accounts or running agent
-services** in this foundation. Recording slots are placeholders, not evidence of
-an executed demo. Generated brand imagery is illustrative, not a customer photo.
+## Sestavení a střih videí
 
-## Cast
-
-| Person | Role | Proposed UPN |
-|---|---|---|
-| Adam Vávra | Group CFO; decisions and learning approval | adam.vavra@tomasonline.net |
-| Piotr Nowak | Managing Director, Poland | piotr.nowak@tomasonline.net |
-| Emma Hartmann | Group FP&A Lead; process and calendar | emma@tomasonline.net |
-| Otto Autopilot | Digital budget-season coordinator | Existing bot identity, binding pending |
-
-UPNs are the desired demo mapping, not a claim that users exist. Verify Emma's
-existing identity before binding it; do not rename an existing account implicitly.
-Adam and Piotr are fictional personas, not depictions of specific real people.
-
-## Author and build
-
-Requires Python 3.12+, Node.js, and FFmpeg/ffprobe for recordings. Document building
-and recording orchestration use the standard library. The vendored image skill
-has its own dependency manifest and lockfile; do not copy environments or secrets.
+Vyžaduje Python 3.12+, Node.js a FFmpeg/ffprobe (pro střih videí):
 
 ```powershell
 python scripts\build_docs.py
 python scripts\build_player.py
+python video-production\build_clips.py                 # sestříhá docs/video/01.mp4..14.mp4 dle edl.json
+python video-production\build_single_player.py --full  # prezentační kopie do dist/
+python video-production\build_single_player.py         # e-mailová kopie do dist/
 python -m unittest discover -s tests -v
-New-Item -ItemType Directory -Force dist | Out-Null
-node docs\assets\bundle.js docs\presentation.html dist\presentation.html
-node docs\assets\bundle.js docs\demo-guide.html dist\demo-guide.html
-python video-production\build_clips.py --check
-python video-production\build_single_player.py         # e-mail copy, clips CRF 28, max 1920 px
-python video-production\build_single_player.py --full  # presentation copy, clips unchanged
-node tests\check_player_browser.cjs docs\player.html dist\Javorna-demo-player-single-file.html
 ```
 
-Edit the JSON scenario and rebuild the HTML documents and player. Read the recording
-skill before capturing new footage. Add verified trim ranges to
-`video-production/edl.json`, then run the cutter with the clip IDs to build.
-The cutter writes `docs/video/NN.mp4`, which the player picks up by scene ID;
-then rebuild both single-file copies in `dist/`. An empty
-EDL intentionally refuses a render rather than reporting a successful empty build.
+## Agent skills
 
-## Brand review
+Potřebné lokální skilly pro správu scénáře, dokumentů a nahrávání jsou ve standardní cestě `.agents/skills/`:
 
-Image preparation: author `brand/brief.yaml`, put verified resource settings in
-ignored `.local/image-settings.json`, then run `python scripts\prepare_images.py`.
-Run the local image-generator skill's offline plan and discovery before inference.
-The current brief uses explicitly approved MAI 2.7 at native 2048x2048. A single
-user-authorized 3840x2160 experiment was rejected by the API (maximum 4,194,304
-pixels). No upscaling or 4K claim is permitted for these candidates.
+- `.agents/skills/budget-season` — pravidla scénáře a pravomocí Javorna Group
+- `.agents/skills/demo-recording` — pravidla nahrávání, střihu (EDL) a balení přehrávače
+- `.agents/skills/html-docs` — šablony a runtime pro HTML prezentaci a návod
+- `.agents/skills/image-generator` — volitelná příprava brandových vizuálů
 
-`python scripts\build_brand_review.py <run-manifest.json>` checks each original's
-dimensions and hash, copies it unchanged to ignored `docs/brand-candidates/`,
-and builds the local `docs/brand-review.html` gallery with title-slide studies.
-Candidates remain unapproved and outside the presentation until selected.
+## Poznámka k soukromým datům
 
-The second review round uses furniture silhouettes and explicitly requested
-wood/foliage brand palettes, without changing the shared document runtime:
-`brand/furniture-brief.yaml` and `brand/furniture-palettes.json`.
-Prepare that brief with
-`python scripts\prepare_images.py brand\furniture-brief.yaml --output .local\furniture-brief.json`.
-After approved generation, run
-`python scripts\build_furniture_review.py <new-run.json> --atelier-manifest <original-run.json>`.
-This preserves the approved atelier image and creates local
-`docs/furniture-review.html` (three comparisons) and `docs/furniture-slides.html`
-(six full-size title/content studies). Logos and palettes can be selected
-independently. All candidates and their original bytes remain local and
-unapproved; `docs/presentation.html` is unchanged.
+Surová a vyrenderovaná videa (`.local/`, `video-raw/`, `docs/video/`, `dist/`), přihlašovací údaje a tenantová konfigurace nejsou součástí Gitu. Repozitář zůstává soukromý, dokud vlastník nerozhodne jinak.
 
-Palette C was chosen. The logo round iterates the chair so its construction is
-plausible: either no armrest, or a three-quarter view where four legs carry the
-arms. Briefs `brand/logo-r1-brief.yaml` to `brand/logo-r3-brief.yaml` produced 16
-candidates; prepare each like the furniture brief, then run
-`python scripts\build_logo_review.py <r1.json> <r2.json> <r3.json> --atelier-manifest <original-run.json>`.
-It builds local `docs/logo-review.html` (three finalists at 128/64/32 px, A4,
-square and announcement Teams widget mockups, and all 16 iterations) and
-`docs/logo-slides.html`. Check it with `node tests\check_logo_browser.cjs`.
-These galleries remain a historical record of the selection process.
-
-### Selected identity: chair 3, palette C
-
-The selected chair now uses transparent SVG instead of a beige square:
-`docs/assets/javorna/chair.svg` for pale surfaces and `chair-on-dark.svg` for
-dark oak. Both have identical geometry in five colour layers (7,932 bytes
-each); the reverse version lightens the materials, not the background.
-The untouched approved PNG and atelier photo are preserved alongside them.
-`brand/identity.json` records selection, hashes and adaptation review status.
-
-Keep the mark free of tiles, frames and shadows, with clear space around it.
-Use 64 px or larger when possible; 32 px stays recognizable but loses detail.
-The main presentation and guide use the selected brand profile. The shared
-document runtime and canonical UI tokens are unchanged.
-
-```powershell
-python scripts\build_docs.py
-python scripts\build_vector_review.py
-node tests\check_vector_browser.cjs
-```
-
-This creates `docs/vector-review.html`, `docs/vector-slides.html` and three
-self-contained offline budget-widget previews plus one commission-type
-selection mockup under `docs/widgets/`. The budget widgets
-contain only SVG data images, readable HTML data, CSS and visual action
-placeholders: no photos, scripts or live actions. The growth-ring motif has
-been removed from the budget widget headers. The three category icons
-(home, workplace and carving tool) appear only where the form asks what type
-of commission this is; they use a restrained single-colour outline, unlike the
-multicolour Javorna chair mark. All previews are offline and contain no scripts
-or live actions; live gateway/Teams delivery is not implemented or verified
-by this design work. The budget widgets include the compact logo but no
-additional header art; their complete offline HTML files are about 25–26 KB.
-The commission-type form mockup is a separate fourth example, with three
-64px line icons (home, workplace desk, carving tool) at about 17 KB total.
-Those illustrations appear only beside their explanatory category labels, not
-in budget summaries.
-
-Optional trace reproduction (requires existing Pillow, NumPy and OpenCV):
-`python scripts\vectorize_chair.py docs\assets\javorna\chair-original.png`.
-The source hash is checked before tracing. The fidelity test renders the SVG
-at the original size and requires over 99% silhouette overlap, including
-transparent joinery openings. The independent visual judge accepted the light
-redraw and, after a contrast correction, the dark variant at 64 px and larger.
-The vector adaptation remains available for the user's visual sign-off.
-
-## Runtime boundary
-
-The architecture is Teams -> gateway -> Hermes -> Foundry, with budget tools
-and WebIQ (`web`, `news`) through the `otto-cio-forum` MCP toolbox. The
-deployment lives in `otto_deployment/agent-demos/autopilots-on-azure` and reuses
-the existing Otto identity (Teams app, Agent 365, Foundry project) with fresh
-Javorna state. This checkout is now authoritative for Otto; do not deploy from
-the earlier customer checkout, which no longer runs live.
-
-Teams: team "Javorna Budget Season" (`8580f2f4-b296-4066-9adb-dc0269bb4fc4`),
-owner Adam, members Emma, Piotr and Otto. Users are provisioned by
-`scripts/javorna_users.py`; first sign-in forces a password change.
-
-Run from the deployment folder with the session Azure config:
-
-```powershell
-uv run --frozen python -m scripts.deploy_apps_runtime --state-name otto --workspace autopilot-otto --apply --auto-approve --capture --deploy-services
-uv run --frozen python -m scripts.budget_season_ops backup
-uv run --frozen python -m scripts.budget_season_ops reset --backup <fresh-backup-dir>
-uv run --frozen python -m scripts.budget_season_ops season reset --week 0
-uv run --frozen python -m scripts.penta_toolbox probe
-```
-
-Reset before every recording. Sandboxes sleep after 300 s idle; warm them with
-one turn first. Do not replay or delete gateway quarantine entries.
-
-Use a separate team/channel, role mapping, agent memory, learning proposals,
-decisions, jobs and application access list. Never reset or reuse another demo's
-state as a shortcut. A country owner's assertion is not a CFO decision.
-Only the CFO approves reusable learning; one-off investment decisions are not
-converted into permanent exemptions.
-
-Before recording: provision and sign in the two users; bind verified Entra IDs;
-verify private/public routing, country confidentiality and learning approval;
-seed week 1 and a separate explicit week-3 snapshot; rehearse app access and a
-confirmed Poland booking. Generated apps use Azure Container Apps sandbox
-terminology, not an unavailable integration.
-
-## Publication and licenses
-
-Do not commit raw videos, browser profiles, conversations, credentials, tenant
-bindings or image-generation manifests. Before future public release, inspect
-every tracked file and approved media item; switching visibility is a separate
-user decision. No old demo history or media was imported.
-
-The vendored `html-docs` and `image-generator` skills retain their MIT licenses
-and notices. Repository-specific content has no public redistribution license
-selected yet.
